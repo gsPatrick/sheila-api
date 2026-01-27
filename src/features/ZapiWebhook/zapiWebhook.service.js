@@ -16,6 +16,7 @@ class ZapiWebhookService {
 
         // 2. Extração de Dados
         const contactNumber = phone;
+        const body = text?.message || '';
         const isAudio = type === 'ReceivedCallback' && audio;
 
         // WHITE-LIST PARA TESTES (Restrito ao número do usuário)
