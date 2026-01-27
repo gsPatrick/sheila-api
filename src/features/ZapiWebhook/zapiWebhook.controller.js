@@ -2,6 +2,7 @@ const zapiWebhookService = require('./zapiWebhook.service');
 
 class ZapiWebhookController {
     async handle(req, res) {
+        console.log('🔹 Controller: Webhook HIT from Z-API');
         const io = req.app.get('io');
         try {
             // Process in background to avoid Z-API timeouts

@@ -18,6 +18,7 @@ class ZapiService {
         };
 
         try {
+            console.log(`📤 Sending Text to ${toNumber}: "${messageBody.substring(0, 30)}..."`);
             const response = await axios.post(
                 `${baseUrl}/send-text`,
                 {
@@ -26,6 +27,7 @@ class ZapiService {
                 },
                 { headers }
             );
+            console.log('✅ Z-API Response:', response.data?.messageId || 'OK');
             return response.data;
         } catch (error) {
             console.error('Error sending message via Z-API:', error.response?.data || error.message);
