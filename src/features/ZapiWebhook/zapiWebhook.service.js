@@ -16,8 +16,17 @@ class ZapiWebhookService {
 
         // 2. Extração de Dados
         const contactNumber = phone;
-        const body = text?.message || '';
         const isAudio = type === 'ReceivedCallback' && audio;
+
+        // WHITE-LIST PARA TESTES (Restrito ao número do usuário)
+        // Aceita formatos com ou sem o 9º dígito
+        const allowedSuffix = '7183141335';
+        const allowedSuffix9 = '71983141335';
+
+        if (!fromMe && !contactNumber.endsWith(allowedSuffix) && !contactNumber.endsWith(allowedSuffix9)) {
+            console.log(`Contact ${contactNumber} not in whitelist. Ignoring.`);
+            return;
+        }
 
         // 3. Verificação da Blacklist
         const isBlacklisted = await blacklistService.isBlacklisted(contactNumber);
