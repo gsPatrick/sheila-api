@@ -126,12 +126,12 @@ class OpenaiService {
 
                             if (io) io.emit('chat_updated', chat);
 
-                            // Push tool result to messages
+                            // Push tool result to messages with details
                             currentMessages.push({
                                 role: 'tool',
                                 tool_call_id: toolCall.id,
                                 name: 'update_customer_data',
-                                content: 'Success: Data saved to database.'
+                                content: `Updated fields: ${Object.keys(data).join(', ')}. Data saved successfully.`
                             });
                         } catch (e) {
                             console.error('Error in tool execution:', e);
@@ -155,6 +155,7 @@ class OpenaiService {
                     }
                 );
                 responseMessage = finalResponse.data.choices[0].message;
+                console.log(`🤖 Final AI Text after tool: "${responseMessage.content?.substring(0, 50)}..."`);
             }
 
             const aiText = responseMessage.content;
