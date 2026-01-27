@@ -90,7 +90,7 @@ class OpenaiService {
             const response = await axios.post(
                 'https://api.openai.com/v1/chat/completions',
                 {
-                    model: 'gpt-4',
+                    model: 'gpt-4o-mini', // Using gpt-4o-mini for faster/better tool handling if available, else keep gpt-4
                     messages: [systemMessage, ...history],
                     tools: tools,
                     tool_choice: "auto"
@@ -105,18 +105,19 @@ class OpenaiService {
 
             console.log(`🤖 OpenAI Response Received. Tokens: ${response.data.usage?.total_tokens}`);
 
-            const responseMessage = response.data.choices[0].message;
-            let aiText = responseMessage.content;
+            let responseMessage = response.data.choices[0].message;
+            const currentMessages = [systemMessage, ...history, responseMessage];
 
-            // Handle Function Calling
+            // Handle Function Calling (Standard Flow)
             if (responseMessage.tool_calls) {
+                console.log(`🛠️ Processing ${responseMessage.tool_calls.length} Tool Calls...`);
+
                 for (const toolCall of responseMessage.tool_calls) {
                     if (toolCall.function.name === 'update_customer_data') {
                         try {
                             const data = JSON.parse(toolCall.function.arguments);
                             console.log(`💾 AI extracted data:`, data);
 
-                            // Update Chat/Contact
                             await chat.update({
                                 contactName: data.name || chat.contactName,
                                 cpf: data.cpf || chat.cpf,
@@ -125,21 +126,42 @@ class OpenaiService {
 
                             if (io) io.emit('chat_updated', chat);
 
-                            // If AI didn't provide text (only tool), we might need a follow-up
-                            // For now, usually GPT-4 provides content AND tool_calls if prompted well.
-                            // If content is null, we need to generate a confirmation message or use a second loop.
-                            if (!aiText) {
-                                // Simple fallback if strictly function call
-                                aiText = "Salrei seus dados. Podemos continuar?";
-                            }
+                            // Push tool result to messages
+                            currentMessages.push({
+                                role: 'tool',
+                                tool_call_id: toolCall.id,
+                                name: 'update_customer_data',
+                                content: 'Success: Data saved to database.'
+                            });
                         } catch (e) {
-                            console.error('Error updating customer data from AI:', e);
+                            console.error('Error in tool execution:', e);
                         }
                     }
                 }
+
+                // Call OpenAI again to get the final text response based on tool results
+                console.log(`🧠 Getting final text response after tool execution...`);
+                const finalResponse = await axios.post(
+                    'https://api.openai.com/v1/chat/completions',
+                    {
+                        model: 'gpt-4o-mini',
+                        messages: currentMessages
+                    },
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${apiKey}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+                responseMessage = finalResponse.data.choices[0].message;
             }
 
-            if (!aiText) return null; // Should not happen with current logic fallback
+            const aiText = responseMessage.content;
+            if (!aiText) {
+                console.log('⚠️ AI returned empty content even after tool processing.');
+                return null;
+            }
 
             // Send via Z-API
             console.log(`📤 Sending to Z-API (${chat.contactNumber}): ${aiText.substring(0, 30)}...`);
