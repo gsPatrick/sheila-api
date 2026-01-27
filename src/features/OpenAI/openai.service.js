@@ -69,11 +69,31 @@ class OpenaiService {
         };
 
         try {
+            const tools = [
+                {
+                    type: "function",
+                    function: {
+                        name: "update_customer_data",
+                        description: "Extracts and saves customer data like Name, CPF, or Email when the user provides them.",
+                        parameters: {
+                            type: "object",
+                            properties: {
+                                name: { type: "string", description: "Customer's full name" },
+                                cpf: { type: "string", description: "Customer's CPF/CNPJ (numbers only)" },
+                                email: { type: "string", description: "Customer's email address" }
+                            },
+                        }
+                    }
+                }
+            ];
+
             const response = await axios.post(
                 'https://api.openai.com/v1/chat/completions',
                 {
                     model: 'gpt-4',
-                    messages: [systemMessage, ...history]
+                    messages: [systemMessage, ...history],
+                    tools: tools,
+                    tool_choice: "auto"
                 },
                 {
                     headers: {
@@ -85,7 +105,41 @@ class OpenaiService {
 
             console.log(`🤖 OpenAI Response Received. Tokens: ${response.data.usage?.total_tokens}`);
 
-            const aiText = response.data.choices[0].message.content;
+            const responseMessage = response.data.choices[0].message;
+            let aiText = responseMessage.content;
+
+            // Handle Function Calling
+            if (responseMessage.tool_calls) {
+                for (const toolCall of responseMessage.tool_calls) {
+                    if (toolCall.function.name === 'update_customer_data') {
+                        try {
+                            const data = JSON.parse(toolCall.function.arguments);
+                            console.log(`💾 AI extracted data:`, data);
+
+                            // Update Chat/Contact
+                            await chat.update({
+                                contactName: data.name || chat.contactName,
+                                cpf: data.cpf || chat.cpf,
+                                email: data.email || chat.email
+                            });
+
+                            if (io) io.emit('chat_updated', chat);
+
+                            // If AI didn't provide text (only tool), we might need a follow-up
+                            // For now, usually GPT-4 provides content AND tool_calls if prompted well.
+                            // If content is null, we need to generate a confirmation message or use a second loop.
+                            if (!aiText) {
+                                // Simple fallback if strictly function call
+                                aiText = "Salrei seus dados. Podemos continuar?";
+                            }
+                        } catch (e) {
+                            console.error('Error updating customer data from AI:', e);
+                        }
+                    }
+                }
+            }
+
+            if (!aiText) return null; // Should not happen with current logic fallback
 
             // Send via Z-API
             console.log(`📤 Sending to Z-API (${chat.contactNumber}): ${aiText.substring(0, 30)}...`);
