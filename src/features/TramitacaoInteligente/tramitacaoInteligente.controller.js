@@ -106,24 +106,19 @@ class TramitacaoInteligenteController {
                 for (const pub of publications) {
                     const { texto, numero_processo, link_tramitacao } = pub;
 
-                    // Notificação Real-Time (Painel)
-                    if (io) {
-                        io.emit('ti_publication_alert', {
-                            process: numero_processo,
-                            text: texto,
-                            link: link_tramitacao,
-                            full: pub
-                        });
-                    }
-
                     // Persistir no Banco de Dados
-                    await AlertLog.create({
+                    const newAlert = await AlertLog.create({
                         title: 'Nova Publicação Judicial',
                         processNumber: numero_processo,
                         body: texto,
                         link: link_tramitacao,
                         rawPayload: pub
                     });
+
+                    // Notificação Real-Time (Painel)
+                    if (io) {
+                        io.emit('ti_publication_alert', newAlert);
+                    }
 
                     // Notificação WhatsApp (Alerta Urgente)
                     if (carolNumber) {

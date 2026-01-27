@@ -25,17 +25,28 @@ class TramitacaoInteligenteService {
         const chat = await Chat.findByPk(chatId);
         if (!chat) throw new Error('Chat not found');
 
+        if (!chat.cpf) throw new Error('CPF is required to create a customer in Tramitacao Inteligente');
+
         const headers = await this.getHeaders();
         const baseUrl = await this.getBaseUrl();
 
+        // Ensure proper phone format (only digits)
+        const cleanPhone = chat.contactNumber ? chat.contactNumber.replace(/\D/g, '') : '';
+        const cleanCpf = chat.cpf.replace(/\D/g, '');
+
         const customerData = {
-            name: chat.contactName || 'Cliente WhatsApp',
-            phone_mobile: chat.contactNumber,
+            customer: {
+                name: chat.contactName || 'Cliente WhatsApp',
+                phone_mobile: cleanPhone,
+                cpf_cnpj: cleanCpf
+            }
         };
 
         try {
             const response = await axios.post(`${baseUrl}/clientes`, customerData, { headers });
-            const { id, uuid } = response.data;
+
+            const createdCustomer = response.data.customer || response.data;
+            const { id, uuid } = createdCustomer;
 
             await chat.update({
                 tramitacaoCustomerId: id,

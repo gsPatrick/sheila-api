@@ -1,0 +1,1342 @@
+openapi: 3.0.0
+info:
+  title: API do Tramitação Inteligente
+  description: |
+
+    🚀 Documentação da API da plataforma Tramitação Inteligente, permitindo a integração com sistemas externos.
+
+    ## 👥 Público alvo
+    
+    Como toda API, é destinada a desenvolvedores. Se você não é desenvolvedor (ou não tem um desenvolvedor), e deseja integrar o Tramitação Inteligente com algum outro sistema, preencha o formulário [nesta página](/api/info) solicitando que nosso time desenvolva a integração.
+
+    ## 📖 Documentação
+
+    A documentação da API pode ser consultada nesta página (que inclusive é interativa e permite testar as requisições usando seu token diretamente) ou, se preferir, baixando [a especificação OpenAPI em YAML](/api/docs.yaml) para utilizá-lo com sua ferramenta de IA preferida.
+    
+    ## 💰 Custo
+    
+    A API é oferecida sem custo adicional para os assinantes do Tramitação.
+
+    ## 📞 Suporte
+
+    Para solicitar acesso ou reportar problemas, utilize o [formulário de suporte](/fale-conosco).
+    
+    ## 🔐 Autenticação
+    
+    Esta API utiliza autenticação por token.
+    
+    ### 🔑 Como obter um token de API:
+    Tokens de API são gerados e gerenciados através do painel de controle. [Clique aqui para gerenciar suas chaves de API](/api/chaves).
+    
+    ### 📝 Usando o token
+    O token deve ser fornecido no header `Authorization`, com o valor `Bearer SEU_TOKEN_DE_API_AQUI`. Por exemplo:
+    ```
+    Authorization: Bearer 7a7cafca351f47a7e...
+    ```
+
+    Ou seja, o nome do header é `Authorization`; já o valor é `Bearer SEU_TOKEN_DE_API_AQUI` (não se esqueça de incluir a string 'Bearer ' antes do token).
+
+    ### 🎮 Autenticação na documentação interativa
+
+    A presente documentação utiliza SwaggerUI e, portanto, é interativa, sendo possível fazer requests diretamente a partir dela.
+
+    Para tanto, é necessário se autenticar, clicando no botão 'Authorize' abaixo e informando seu token de API.
+    
+    ## 🔔 Webhooks
+    
+    A API suporta webhooks para notificar aplicações externas sobre eventos importantes. 
+    
+    Os webhooks podem ser configurados através do [painel de configuração](/api/webhooks/endpoints). Cada evento enviará um payload JSON com os dados do recurso afetado.
+    
+    Os seguintes eventos estão disponíveis:
+    
+    ### Eventos de Cliente:
+    - `customer.created` - Cliente foi criado
+    - `customer.updated` - Cliente foi atualizado
+    - `customer.destroyed` - Cliente foi removido (payload contém apenas o ID)
+    
+    ### Eventos de Usuário:
+    - `user.created` - Usuário foi criado
+    - `user.updated` - Usuário foi atualizado
+    - `user.destroyed` - Usuário foi removido (payload contém apenas o ID)
+
+    ### Eventos de Publicação:
+    - `publications.created` - Novas publicações judiciais foram importadas. É necessário configurar previamente as OABs monitoradas em [painel de configuração](/publicacoes/configuracoes). 
+    
+    O payload contém um array de publicações e é enviado diariamente após o término da importação das publicações do dia. 
+    
+    Veja o exemplo de payload na seção Schemas, em `PublicationsCreatedPayload`), ou, se preferir, veja o exemplo abaixo:
+
+    ```json
+    {
+      "event_type": "publications.created",
+      "idempotency_key": "550e8400-e29b-41d4-a716-446655440000",
+      "timestamp": "2025-12-15T10:30:00Z",
+      "timestamp_epoch": 1734263400,
+      "payload": {
+        "publications": [
+          {
+            "id": 123,
+            "uuid": "550e8400-e29b-41d4-a716-446655440001",
+            "disponibilizacao_date": "2025-12-15",
+            "publication_date": "2025-12-16",
+            "inicio_do_prazo_date": "2025-12-17",
+            "created_at": "2025-12-15T10:30:00Z",
+            "link_tramitacao": "https://tramitacaointeligente.com.br/publicacoes/123",
+            "link": "https://pje.trf3.jus.br/xxx",
+            "texto": "PODER JUDICIÁRIO...",
+            "nomeOrgao": "2ª Vara Gabinete JEF de Campo Grande",
+            "nomeClasse": "PROCEDIMENTO DO JUIZADO ESPECIAL CÍVEL",
+            "siglaTribunal": "TRF3",
+            "numero_processo": "50103311520244036201",
+            "numero_processo_com_mascara": "5010331-15.2024.4.03.6201",
+            "destinatarios": [
+              { "nome": "MARIA SILVA SANTOS", "polo": "A" }
+            ],
+            "destinatario_advogados": [
+              { "nome": "JOÃO PEREIRA", "uf_oab": "SP", "numero_oab": "12345" }
+            ]
+          }
+        ]
+      }
+    }
+    ```
+    
+    ### 🔄 Idempotência
+    
+    Para garantir o processamento seguro dos webhooks, cada entrega inclui uma chave de idempotência:
+    
+    - **Header**: `X-Webhook-Idempotency-Key` contém o ID único do evento
+    - **Payload**: Campo `idempotency_key` no JSON também contém o mesmo ID
+    
+    A chave de idempotência representa o evento de negócio único que ocorreu. Use esta chave para:
+    - Detectar e evitar processamento duplicado do mesmo evento
+    - Identificar tentativas de reenvio (retry) do mesmo evento
+    - Garantir que o mesmo evento recebido em múltiplos endpoints seja tratado como único
+    
+    **Importante**: A mesma chave será usada em todas as tentativas de entrega (incluindo retries) e em todos os endpoints que recebem o mesmo evento.
+    
+  version: 1.0.0
+    
+servers:
+  - url: /api/v1
+    description: Servidor da API
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: clientes
+    description: Operações de gerenciamento de clientes
+  - name: usuarios
+    description: Operações de gerenciamento de usuários da organização
+  - name: notas
+    description: Operações de gerenciamento de notas
+
+paths:
+  /clientes:
+    get:
+      summary: Listar clientes
+      description: Retorna uma lista paginada de clientes da organização do usuário autenticado
+      tags:
+        - clientes
+      parameters:
+        - name: per_page
+          in: query
+          description: Número de clientes por página (padrão 20, máximo 100)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: page
+          in: query
+          description: Número da página (padrão 1)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        '200':
+          description: Lista de clientes com metadados de paginação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  customers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Customer'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          description: Não autorizado - token inválido ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+    post:
+      summary: Criar um novo cliente
+      description: Cria um novo cliente na organização do usuário autenticado
+      tags:
+        - clientes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerInput'
+      responses:
+        '201':
+          description: Cliente criado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  customer:
+                    $ref: '#/components/schemas/Customer'
+        '422':
+          description: Erros de validação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Não autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+
+  /clientes/{id}:
+    get:
+      summary: Buscar cliente por ID
+      description: Retorna um único cliente pelo seu ID (o mesmo ID exibido na interface web)
+      tags:
+        - clientes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID do cliente (mesmo ID exibido na interface web)
+          schema:
+            type: integer
+            example: 123
+      responses:
+        '200':
+          description: Detalhes do cliente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  customer:
+                    $ref: '#/components/schemas/Customer'
+        '404':
+          description: Cliente não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '401':
+          description: Não autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+    patch:
+      summary: Atualizar cliente
+      description: Atualiza um cliente existente (parcial ou completo). Use o mesmo ID exibido na interface web.
+      tags:
+        - clientes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID do cliente (mesmo ID exibido na interface web)
+          schema:
+            type: integer
+            example: 123
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerInput'
+      responses:
+        '200':
+          description: Cliente atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  customer:
+                    $ref: '#/components/schemas/Customer'
+        '422':
+          description: Erros de validação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '404':
+          description: Cliente não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '401':
+          description: Não autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+    delete:
+      summary: Deletar cliente
+      description: Deleta permanentemente um cliente e todos os dados associados. Use o mesmo ID exibido na interface web.
+      tags:
+        - clientes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID do cliente (mesmo ID exibido na interface web)
+          schema:
+            type: integer
+            example: 123
+      responses:
+        '204':
+          description: Cliente deletado com sucesso
+        '404':
+          description: Cliente não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '401':
+          description: Não autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+
+  /usuarios:
+    get:
+      summary: Listar usuários do escritório
+      description: Retorna uma lista paginada de usuários da organização
+      tags:
+        - usuarios
+      parameters:
+        - name: per_page
+          in: query
+          description: Número de usuários por página (padrão 20, máximo 100)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: page
+          in: query
+          description: Número da página (padrão 1)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        '200':
+          description: Lista de usuários com metadados de paginação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          description: Não autorizado - token inválido ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+    post:
+      summary: Criar um novo usuário
+      description: |
+        Cria um novo usuário na organização do usuário autenticado.
+        
+        O usuário será criado com as credenciais especificadas e poderá fazer login na plataforma.
+        Opcionalmente, você pode especificar os papéis (roles) que o usuário deve ter na organização.
+      tags:
+        - usuarios
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      responses:
+        '201':
+          description: Usuário criado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '422':
+          description: Erros de validação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Não autorizado - token inválido ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+
+  /usuarios/{id}:
+    get:
+      summary: Obter usuário por ID
+      description: Retorna os detalhes de um usuário específico
+      tags:
+        - usuarios
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID público do usuário
+          schema:
+            type: string
+            example: "user_abc123"
+      responses:
+        '200':
+          description: Detalhes do usuário
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '404':
+          description: Usuário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '401':
+          description: Não autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+    patch:
+      summary: Atualizar usuário
+      description: |
+        Atualiza os dados de um usuário existente, incluindo suas funções.
+        
+        **⚠️ Importante:** Não é possível remover a função de administrador de um usuário através da API. Se um usuário já possui a função "admin", ela deve ser mantida na lista de funções. Para remover privilégios de administrador, utilize a interface web.
+      tags:
+        - usuarios
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID público do usuário
+          schema:
+            type: string
+            example: "user_abc123"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      responses:
+        '200':
+          description: Usuário atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '422':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '404':
+          description: Usuário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '401':
+          description: Não autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+
+  /notas:
+    get:
+      summary: Listar notas
+      description: Retorna uma lista paginada de notas da organização do usuário autenticado. Opcionalmente, filtre por cliente específico usando o parâmetro customer_id.
+      tags:
+        - notas
+      parameters:
+        - name: customer_id
+          in: query
+          description: ID interno do cliente para filtrar notas (opcional). Use o mesmo ID exibido na interface web.
+          required: false
+          schema:
+            type: integer
+            example: 123
+        - name: per_page
+          in: query
+          description: Número de notas por página (padrão 20, máximo 100)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: page
+          in: query
+          description: Número da página (padrão 1)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        '200':
+          description: Lista de notas com metadados de paginação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Note'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          description: Não autorizado - token inválido ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+    post:
+      summary: Criar uma nova nota
+      description: 
+        |
+        Cria uma nova nota na organização do usuário autenticado. 
+        
+        Você pode opcionalmente associar a nota a um cliente específico usando o parâmetro `customer_id`.
+      tags:
+        - notas
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteInput'
+      responses:
+        '201':
+          description: Nota criada com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  note:
+                    $ref: '#/components/schemas/Note'
+        '422':
+          description: Erros de validação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Não autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+
+  /notas/{id}:
+    get:
+      summary: Buscar nota por ID
+      description: Retorna uma única nota pelo seu ID interno (o mesmo ID exibido na interface web)
+      tags:
+        - notas
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID interno da nota (mesmo ID exibido na interface web)
+          schema:
+            type: integer
+            example: 123
+      responses:
+        '200':
+          description: Detalhes da nota
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  note:
+                    $ref: '#/components/schemas/Note'
+        '404':
+          description: Nota não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '401':
+          description: Não autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+    patch:
+      summary: Atualizar nota
+      description: Atualiza uma nota existente (parcial ou completo). Use o mesmo ID exibido na interface web.
+      tags:
+        - notas
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID interno da nota (mesmo ID exibido na interface web)
+          schema:
+            type: integer
+            example: 123
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteInput'
+      responses:
+        '200':
+          description: Nota atualizada com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  note:
+                    $ref: '#/components/schemas/Note'
+        '422':
+          description: Erros de validação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '404':
+          description: Nota não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '401':
+          description: Não autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+    delete:
+      summary: Deletar nota
+      description: Deleta permanentemente uma nota. Use o mesmo ID exibido na interface web.
+      tags:
+        - notas
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID interno da nota (mesmo ID exibido na interface web)
+          schema:
+            type: integer
+            example: 123
+      responses:
+        '204':
+          description: Nota deletada com sucesso
+        '404':
+          description: Nota não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '401':
+          description: Não autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: |
+        Informe abaixo o seu token de API.
+
+        Esta documentação interativa automaticamente incluirá o header 'Authorization', com a string 'Bearer' antes do token.
+
+        Ou seja: para testar a API nesta interface, você deve informar **APENAS** o seu token de API abaixo, sem a palavra 'Bearer' e nem a palavra Authorization, informando **apenas** o token.
+      
+  schemas:
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID do cliente (mesmo ID exibido na interface web)
+          example: 123
+        uuid:
+          type: string
+          format: uuid
+          description: UUID do cliente
+        name:
+          type: string
+          description: Nome completo do cliente
+          example: "João Silva Santos"
+        cpf_cnpj:
+          type: string
+          description: Número de CPF ou CNPJ brasileiro
+          example: "123.456.789-00"
+        email:
+          type: string
+          format: email
+          example: "joao@exemplo.com"
+        phone_mobile:
+          type: string
+          description: Número de celular (apenas dígitos)
+          example: "11987654321"
+        phone_1:
+          type: string
+          description: Telefone principal (apenas dígitos)
+          example: "1133334444"
+        phone_2:
+          type: string
+          description: Telefone secundário (apenas dígitos)
+          example: "1133335555"
+        country:
+          type: string
+          example: "Brasil"
+        state:
+          type: string
+          description: Sigla do estado brasileiro
+          example: "SP"
+        city:
+          type: string
+          example: "São Paulo"
+        neighborhood:
+          type: string
+          example: "Vila Madalena"
+        zipcode:
+          type: string
+          description: CEP brasileiro
+          example: "05432-000"
+        street:
+          type: string
+          example: "Rua das Flores"
+        street_number:
+          type: string
+          example: "123"
+        sexo:
+          type: string
+          enum: ["M", "F"]
+          example: "M"
+        birthdate:
+          type: string
+          format: date
+          example: "1980-05-15"
+        deathdate:
+          type: string
+          format: date
+          nullable: true
+          example: null
+        marital_status:
+          type: string
+          example: "solteiro"
+        profession:
+          type: string
+          example: "engenheiro"
+        meu_inss_pass:
+          type: string
+          description: Senha para o portal Meu INSS
+          example: "senha123"
+        rg_numero:
+          type: string
+          description: Número do documento RG
+          example: "12.345.678-9"
+        rg_data_emissao:
+          type: string
+          description: Data de emissão do RG
+          example: "2000-01-15"
+        father_name:
+          type: string
+          example: "José Silva"
+        father_birthdate:
+          type: string
+          format: date
+          nullable: true
+          example: "1950-03-20"
+        mother_name:
+          type: string
+          example: "Maria Silva"
+        mother_birthdate:
+          type: string
+          format: date
+          nullable: true
+          example: "1955-07-10"
+        cnh_numero:
+          type: string
+          description: Número da Carteira Nacional de Habilitação
+          example: "12345678901"
+        cnh_emissao:
+          type: string
+          format: date
+          nullable: true
+          example: "2020-01-15"
+        cnh_validade:
+          type: string
+          format: date
+          nullable: true
+          example: "2025-01-15"
+        origin:
+          type: string
+          description: Como o cliente foi criado
+          example: "manually"
+        short_public_id:
+          type: string
+          description: Identificador público curto do cliente
+          example: "ABC123"
+        inbound_email_address_version:
+          type: integer
+          description: Versão do endereço de email de entrada
+          example: 3
+        created_at:
+          type: string
+          format: date-time
+          example: "2023-01-15T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2023-01-16T14:20:00Z"
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+    
+    CustomerInput:
+      type: object
+      required:
+        - name
+        - cpf_cnpj
+      properties:
+        customer:
+          type: object
+          required:
+            - name
+            - cpf_cnpj
+          properties:
+            name:
+              type: string
+              description: Nome completo do cliente
+              example: "João Silva Santos"
+            cpf_cnpj:
+              type: string
+              description: Número de CPF ou CNPJ brasileiro
+              example: "123.456.789-00"
+            email:
+              type: string
+              format: email
+              example: "joao@exemplo.com"
+            phone_mobile:
+              type: string
+              description: Número de celular (apenas dígitos)
+              example: "11987654321"
+            phone_1:
+              type: string
+              description: Telefone principal (apenas dígitos)
+              example: "1133334444"
+            phone_2:
+              type: string
+              description: Telefone secundário (apenas dígitos)
+              example: "1133335555"
+            country:
+              type: string
+              example: "Brasil"
+            state:
+              type: string
+              description: Sigla do estado brasileiro
+              example: "SP"
+            city:
+              type: string
+              example: "São Paulo"
+            neighborhood:
+              type: string
+              example: "Vila Madalena"
+            zipcode:
+              type: string
+              description: CEP brasileiro
+              example: "05432-000"
+            street:
+              type: string
+              example: "Rua das Flores"
+            street_number:
+              type: string
+              example: "123"
+            sexo:
+              type: string
+              enum: ["M", "F"]
+              example: "M"
+            birthdate:
+              type: string
+              format: date
+              example: "1980-05-15"
+            deathdate:
+              type: string
+              format: date
+              nullable: true
+            marital_status:
+              type: string
+              example: "solteiro"
+            profession:
+              type: string
+              example: "engenheiro"
+            meu_inss_pass:
+              type: string
+              description: Senha para o portal Meu INSS
+            rg_numero:
+              type: string
+              description: Número do documento RG
+              example: "12.345.678-9"
+            rg_data_emissao:
+              type: string
+              description: Data de emissão do RG
+              example: "15/01/2000"
+            father_name:
+              type: string
+              example: "José Silva"
+            father_birthdate:
+              type: string
+              format: date
+              example: "1950-03-20"
+            mother_name:
+              type: string
+              example: "Maria Silva"
+            mother_birthdate:
+              type: string
+              format: date
+              example: "1955-07-10"
+            cnh_numero:
+              type: string
+              description: Número da Carteira Nacional de Habilitação
+              example: "12345678901"
+            cnh_emissao:
+              type: string
+              format: date
+              example: "2020-01-15"
+            cnh_validade:
+              type: string
+              format: date
+              example: "2025-01-15"
+            tags:
+              type: array
+              description: Lista de tags do cliente
+              items:
+                type: string
+              example: ["VIP", "Ativo"]
+    
+    Tag:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "VIP"
+        color:
+          type: string
+          example: "#ff0000"
+    
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ID público do usuário
+          example: "user_abc123"
+        uuid:
+          type: string
+          format: uuid
+          description: UUID único do usuário
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        name:
+          type: string
+          description: Nome completo do usuário
+          example: "João Silva"
+        email:
+          type: string
+          format: email
+          description: Email do usuário
+          example: "joao@exemplo.com"
+        phone_mobile:
+          type: string
+          description: Número de celular (apenas dígitos)
+          example: "11987654321"
+        created_at:
+          type: string
+          format: date-time
+          example: "2023-01-15T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2023-01-16T14:20:00Z"
+        roles:
+          type: array
+          description: Lista de funções do usuário na organização
+          items:
+            type: string
+            enum: ["admin", "finances"]
+          example: ["admin"]
+    
+    UserInput:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            name:
+              type: string
+              description: Nome completo do usuário
+              example: "João Silva Santos"
+            email:
+              type: string
+              format: email
+              description: Email do usuário
+              example: "joao@exemplo.com"
+            password:
+              type: string
+              description: Senha do usuário (obrigatória para criação)
+              example: "senha123"
+            phone_mobile:
+              type: string
+              description: Número de celular (apenas dígitos)
+              example: "11987654321"
+            roles:
+              type: array
+              description: Lista de funções do usuário
+              items:
+                type: string
+                enum: ["admin", "finances"]
+              example: ["admin", "finances"]
+    
+    Pagination:
+      type: object
+      properties:
+        count:
+          type: integer
+          description: Número total de registros
+          example: 150
+        page:
+          type: integer
+          description: Número da página atual
+          example: 1
+        items:
+          type: integer
+          description: Número de itens por página
+          example: 20
+        pages:
+          type: integer
+          description: Número total de páginas
+          example: 8
+        from:
+          type: integer
+          description: Número do registro inicial
+          example: 1
+        to:
+          type: integer
+          description: Número do registro final
+          example: 20
+        prev:
+          type: integer
+          nullable: true
+          description: Número da página anterior
+          example: null
+        next:
+          type: integer
+          nullable: true
+          description: Número da próxima página
+          example: 2
+    
+    UnauthorizedError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Sem permissão"
+          
+    NotFoundError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Não encontrado"
+    
+    ValidationError:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: string
+          example: ["Nome não pode ficar em branco", "CPF/CNPJ é inválido"]
+    
+    Note:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID interno da nota (mesmo ID exibido na interface web)
+          example: 123
+        uuid:
+          type: string
+          format: uuid
+          description: UUID único da nota
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        content:
+          type: string
+          description: Conteúdo da nota
+          example: "Reunião marcada para discutir o caso"
+        created_at:
+          type: string
+          format: date-time
+          description: Data e hora de criação da nota
+          example: "2023-01-15T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Data e hora da última atualização
+          example: "2023-01-16T14:20:00Z"
+        user:
+          type: object
+          description: Usuário que criou a nota
+          properties:
+            id:
+              type: string
+              description: ID público do usuário
+              example: "user_abc123"
+            uuid:
+              type: string
+              format: uuid
+              description: UUID do usuário
+              example: "550e8400-e29b-41d4-a716-446655440001"
+            name:
+              type: string
+              description: Nome do usuário
+              example: "João Silva"
+            email:
+              type: string
+              format: email
+              description: Email do usuário
+              example: "joao@exemplo.com"
+        customer:
+          type: object
+          nullable: true
+          description: Cliente associado à nota (se houver)
+          properties:
+            id:
+              type: integer
+              description: ID do cliente
+              example: 456
+            uuid:
+              type: string
+              format: uuid
+              description: UUID do cliente
+              example: "550e8400-e29b-41d4-a716-446655440002"
+            name:
+              type: string
+              description: Nome do cliente
+              example: "Maria Santos"
+            cpf_cnpj:
+              type: string
+              description: CPF/CNPJ do cliente
+              example: "123.456.789-00"
+            email:
+              type: string
+              format: email
+              description: Email do cliente
+              example: "maria@exemplo.com"
+    
+    NoteInput:
+      type: object
+      required:
+        - note
+      properties:
+        note:
+          type: object
+          required:
+            - content
+            - user_id
+          properties:
+            content:
+              type: string
+              description: Conteúdo da nota
+              example: "Reunião marcada para discutir o caso"
+            user_id:
+              type: string
+              description: |
+                ID público do usuário que será associado à nota.
+                
+                **⚠️ Importante:** Como o token de API representa um usuário de serviço, você deve especificar qual usuário real da organização será o autor da nota. Use o endpoint `/usuarios` para obter os IDs válidos.
+              example: "user_abc123"
+            customer_id:
+              type: integer
+              description: ID do cliente para associar à nota (opcional)
+              example: 456
+
+    Publication:
+      type: object
+      description: Publicação do Diário de Justiça Eletrônico
+      properties:
+        id:
+          type: integer
+          description: ID interno da publicação
+          example: 123
+        uuid:
+          type: string
+          format: uuid
+          description: UUID da publicação
+        disponibilizacao_date:
+          type: string
+          format: date
+          description: Data de disponibilização no DJE
+          example: "2025-12-15"
+        publication_date:
+          type: string
+          format: date
+          description: Data da publicação (primeiro dia útil após disponibilização)
+          example: "2025-12-16"
+        inicio_do_prazo_date:
+          type: string
+          format: date
+          description: Data de início do prazo (primeiro dia útil após publicação)
+          example: "2025-12-17"
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-12-15T10:30:00Z"
+        link_tramitacao:
+          type: string
+          format: uri
+          description: Link para visualização da publicação no Tramitação Inteligente
+          example: "https://tramitacaointeligente.com.br/publicacoes/123"
+        link:
+          type: string
+          format: uri
+          description: Link para visualização da publicação no tribunal
+          example: "https://pje.trf3.jus.br/..."
+        texto:
+          type: string
+          description: Texto completo da publicação
+        nomeOrgao:
+          type: string
+          description: Nome do órgão/vara
+          example: "2ª Vara Gabinete JEF de Campo Grande"
+        nomeClasse:
+          type: string
+          description: Classe processual
+          example: "PROCEDIMENTO DO JUIZADO ESPECIAL CÍVEL"
+        siglaTribunal:
+          type: string
+          description: Sigla do tribunal
+          example: "TRF3"
+        numero_processo:
+          type: string
+          description: Número do processo (sem máscara)
+          example: "50103311520244036201"
+        numero_processo_com_mascara:
+          type: string
+          description: Número do processo formatado
+          example: "5010331-15.2024.4.03.6201"
+        destinatarios:
+          type: array
+          items:
+            type: object
+            properties:
+              nome:
+                type: string
+                description: Nome do destinatário
+                example: "MARIA SILVA SANTOS"
+              polo:
+                type: string
+                description: Polo processual (A = Ativo, P = Passivo)
+                example: "A"
+        destinatario_advogados:
+          type: array
+          items:
+            type: object
+            properties:
+              nome:
+                type: string
+                description: Nome do advogado
+                example: "JOÃO PEREIRA"
+              uf_oab:
+                type: string
+                description: UF da OAB
+                example: "SP"
+              numero_oab:
+                type: string
+                description: Número da OAB
+                example: "12345"
+
+    PublicationsCreatedPayload:
+      type: object
+      description: Payload do webhook publications.created
+      properties:
+        event_type:
+          type: string
+          example: "publications.created"
+        idempotency_key:
+          type: string
+          format: uuid
+          description: Chave única para identificar o evento
+        timestamp:
+          type: string
+          format: date-time
+        timestamp_epoch:
+          type: integer
+          description: Timestamp em formato Unix epoch
+          example: 1734263400
+        payload:
+          type: object
+          properties:
+            publications:
+              type: array
+              items:
+                $ref: '#/components/schemas/Publication'
