@@ -10,6 +10,7 @@ class SettingsService {
         'tramitacaoApiKey': 'TRAMITACAO_API_KEY',
         'tramitacaoApiBaseUrl': 'TRAMITACAO_API_BASE_URL',
         'tramitacaoWebhookUrl': 'TRAMITACAO_WEBHOOK_URL',
+        'tramitacaoWebhookSecret': 'TRAMITACAO_WEBHOOK_SECRET',
         'carol_alert_number': 'CAROL_ALERT_NUMBER'
     };
 

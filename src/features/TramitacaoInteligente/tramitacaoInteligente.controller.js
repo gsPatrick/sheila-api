@@ -3,6 +3,8 @@ const zapiService = require('../ZapiWebhook/zapi.service');
 const { Chat, AlertLog } = require('../../models');
 const settingsService = require('../Settings/settings.service');
 
+const crypto = require('crypto');
+
 class TramitacaoInteligenteController {
     // REST Endpoints
     async createCustomer(req, res) {
