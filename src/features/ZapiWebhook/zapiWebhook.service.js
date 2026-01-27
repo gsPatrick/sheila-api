@@ -12,23 +12,23 @@ class ZapiWebhookService {
         const { phone, fromMe, text, audio, type, senderName, instanceId, messageId } = payload;
         const msgId = messageId || payload.id; // Z-API variation
 
-        // Ignore status updates (READ, RECEIVED, etc) and other non-message types
+        // Ignore status updates
         if (type === 'MessageStatusCallback' || (type && type !== 'ReceivedCallback')) {
             return;
         }
 
-        console.log(`📩 Webhook Received from ${phone}: ${text?.message?.substring(0, 50)}...`);
+        console.log(`📩 Webhook Received [ID: ${msgId}] from ${phone} (fromMe: ${fromMe}): ${text?.message?.substring(0, 30)}...`);
 
         // 2. Extração de Dados
         const contactNumber = phone;
         const body = text?.message || '';
         const isAudio = type === 'ReceivedCallback' && audio;
-        const isMsgFromMe = fromMe === true; // Force boolean
+        const isMsgFromMe = fromMe === true || fromMe === 'true'; // Handle string bool
 
         // 2b. Check if this is a Bot message (just sent by us)
         const isBot = zapiService.checkAndClearBotMessage(msgId);
         if (isBot && isMsgFromMe) {
-            console.log(`🤖 Bot message confirmation (${msgId}). Skipping duplicate processing.`);
+            console.log(`🤖 Bot message confirmation (${msgId}). Skipping duplicate and deactivation logic.`);
             return;
         }
 
