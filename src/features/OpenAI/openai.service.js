@@ -61,6 +61,8 @@ class OpenaiService {
             content: msg.body
         }));
 
+        console.log(`🧠 Generating Response for Chat ${chatId}. History Length: ${history.length}`);
+
         const systemMessage = {
             role: 'system',
             content: mainPrompt || 'Você é um assistente prestativo.'
@@ -81,9 +83,12 @@ class OpenaiService {
                 }
             );
 
+            console.log(`🤖 OpenAI Response Received. Tokens: ${response.data.usage?.total_tokens}`);
+
             const aiText = response.data.choices[0].message.content;
 
             // Send via Z-API
+            console.log(`📤 Sending to Z-API (${chat.contactNumber}): ${aiText.substring(0, 30)}...`);
             await zapiService.sendMessage(chat.contactNumber, aiText);
 
             // Save as message

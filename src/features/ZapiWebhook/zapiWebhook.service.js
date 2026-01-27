@@ -16,6 +16,8 @@ class ZapiWebhookService {
             return;
         }
 
+        console.log(`📩 Webhook Received from ${phone}: ${text?.message?.substring(0, 50)}...`);
+
         // 2. Extração de Dados
         const contactNumber = phone;
         const body = text?.message || '';
@@ -28,9 +30,10 @@ class ZapiWebhookService {
         const allowedSuffix9 = '71983141335';
 
         if (!isMsgFromMe && !contactNumber.endsWith(allowedSuffix) && !contactNumber.endsWith(allowedSuffix9)) {
-            console.log(`Contact ${contactNumber} not in whitelist. Ignoring.`);
+            console.log(`❌ Contact ${contactNumber} BLOCKED by Whitelist. Ignoring.`);
             return;
         }
+        console.log(`✅ Contact ${contactNumber} passed Whitelist.`);
 
         // 3. Verificação da Blacklist
         const isBlacklisted = await blacklistService.isBlacklisted(contactNumber);
@@ -41,6 +44,7 @@ class ZapiWebhookService {
 
         // 4. Gerenciamento de Chat
         const chat = await chatService.findOrCreateChat(contactNumber, senderName);
+        console.log(`📂 Chat found/created. ID: ${chat.id} | AI Active: ${chat.isAiActive}`);
 
         // 5. Processamento de Mensagem
         let newMessage;
@@ -92,8 +96,11 @@ class ZapiWebhookService {
 
         // 8. Acionamento da IA
         if (chat.isAiActive && !isMsgFromMe) {
+            console.log('🤖 AI Active. Triggering Response Generation...');
             // Generate AI response
-            openaiService.generateResponse(chat.id, io).catch(err => console.error('GPT error:', err));
+            openaiService.generateResponse(chat.id, io).catch(err => console.error('❌ GPT error:', err));
+        } else {
+            console.log(`⏭️ Skipping AI. Active: ${chat.isAiActive}, FromMe: ${isMsgFromMe}`);
         }
     }
 
