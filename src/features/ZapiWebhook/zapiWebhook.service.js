@@ -11,20 +11,23 @@ class ZapiWebhookService {
     async process(payload, io) {
         const { phone, fromMe, text, audio, type, senderName, instanceId } = payload;
 
-        // 1. Validation (optional, can be expanded)
-        // if (!this.validate(payload)) return;
+        // Ignore status updates (READ, RECEIVED, etc) and other non-message types
+        if (type === 'MessageStatusCallback' || (type && type !== 'ReceivedCallback')) {
+            return;
+        }
 
         // 2. Extração de Dados
         const contactNumber = phone;
         const body = text?.message || '';
         const isAudio = type === 'ReceivedCallback' && audio;
+        const isMsgFromMe = fromMe === true; // Force boolean
 
         // WHITE-LIST PARA TESTES (Restrito ao número do usuário)
         // Aceita formatos com ou sem o 9º dígito
         const allowedSuffix = '7183141335';
         const allowedSuffix9 = '71983141335';
 
-        if (!fromMe && !contactNumber.endsWith(allowedSuffix) && !contactNumber.endsWith(allowedSuffix9)) {
+        if (!isMsgFromMe && !contactNumber.endsWith(allowedSuffix) && !contactNumber.endsWith(allowedSuffix9)) {
             console.log(`Contact ${contactNumber} not in whitelist. Ignoring.`);
             return;
         }
@@ -51,7 +54,7 @@ class ZapiWebhookService {
             newMessage = await Message.create({
                 ChatId: chat.id,
                 body: '[Áudio]',
-                isFromMe: fromMe,
+                isFromMe: isMsgFromMe,
                 audioUrl: fileName,
                 timestamp: new Date()
             });
@@ -67,7 +70,7 @@ class ZapiWebhookService {
             newMessage = await Message.create({
                 ChatId: chat.id,
                 body: body,
-                isFromMe: fromMe,
+                isFromMe: isMsgFromMe,
                 timestamp: new Date()
             });
         }
@@ -78,7 +81,7 @@ class ZapiWebhookService {
         }
 
         // 7. Desativação Automática da IA
-        if (fromMe) {
+        if (isMsgFromMe) {
             // If sent from the synced phone, disable AI for this chat (to the recipient)
             await chatService.updateAiStatus(chat.id, false);
             if (io) {
@@ -88,7 +91,7 @@ class ZapiWebhookService {
         }
 
         // 8. Acionamento da IA
-        if (chat.isAiActive && !fromMe) {
+        if (chat.isAiActive && !isMsgFromMe) {
             // Generate AI response
             openaiService.generateResponse(chat.id, io).catch(err => console.error('GPT error:', err));
         }
