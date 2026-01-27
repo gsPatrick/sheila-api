@@ -19,13 +19,6 @@ class ZapiWebhookService {
         const body = text?.message || '';
         const isAudio = type === 'ReceivedCallback' && audio;
 
-        // WHITE-LIST PARA TESTES (SOLICITADO PELO USUÁRIO)
-        const allowedNumber = '71982862912';
-        if (!fromMe && contactNumber !== allowedNumber) {
-            console.log(`Contact ${contactNumber} not in whitelist for testing. Ignoring.`);
-            return;
-        }
-
         // 3. Verificação da Blacklist
         const isBlacklisted = await blacklistService.isBlacklisted(contactNumber);
         if (isBlacklisted) {
