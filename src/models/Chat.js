@@ -47,6 +47,18 @@ const Chat = sequelize.define('Chat', {
     notes: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    hasLawyer: {
+        type: DataTypes.BOOLEAN,
+        allowNull: true
+    },
+    area: {
+        type: DataTypes.STRING, // 'previdenciario', 'trabalhista', 'outro'
+        allowNull: true
+    },
+    triageStatus: {
+        type: DataTypes.STRING, // 'em_andamento', 'finalizada', 'encerrada_etica'
+        defaultValue: 'em_andamento'
     }
 });
 

@@ -28,21 +28,9 @@ class ZapiWebhookService {
         // 2b. Check if this is a Bot message (just sent by us)
         const isBot = zapiService.checkAndClearBotMessage(msgId);
 
-        if (isMsgFromMe) {
-            if (isBot) {
-                console.log(`🤖 Bot message echo detected (ID: ${msgId}). Skipping deactivation.`);
-                return;
-            }
-            // Fallback: If it's from me but ID wasn't in cache, check if it's the same content as the last bot message
-            const lastMessage = await Message.findOne({
-                where: { ChatId: chat.id, isFromMe: true },
-                order: [['createdAt', 'DESC']]
-            });
-            if (lastMessage && lastMessage.body === body && (new Date() - lastMessage.createdAt) < 30000) {
-                console.log(`🤖 Bot message fallback detected (Content Match). Skipping deactivation.`);
-                return;
-            }
-            console.log(`👤 Manual human intervention detected. Message: "${body.substring(0, 20)}..."`);
+        if (isMsgFromMe && isBot) {
+            console.log(`🤖 Bot message echo detected (ID: ${msgId}). Skipping deactivation.`);
+            return;
         }
 
         // WHITE-LIST PARA TESTES (Restrito ao número do usuário)

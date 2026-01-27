@@ -74,13 +74,17 @@ class OpenaiService {
                     type: "function",
                     function: {
                         name: "update_customer_data",
-                        description: "Extracts and saves customer data like Name, CPF, or Email when the user provides them.",
+                        description: "Extracts and saves customer data whenever the user provides information during the triage. Call this function every time you learn something new about the customer. Include all fields you know about, not just the new ones.",
                         parameters: {
                             type: "object",
                             properties: {
                                 name: { type: "string", description: "Customer's full name" },
                                 cpf: { type: "string", description: "Customer's CPF/CNPJ (numbers only)" },
-                                email: { type: "string", description: "Customer's email address" }
+                                email: { type: "string", description: "Customer's email address" },
+                                hasLawyer: { type: "boolean", description: "Whether the customer already has a lawyer for this case. true if yes, false if no." },
+                                area: { type: "string", enum: ["previdenciario", "trabalhista", "outro"], description: "The area of law the customer needs help with" },
+                                notes: { type: "string", description: "Summary of the conversation so far, including all relevant context like employment history, health issues, benefits status, etc." },
+                                triageStatus: { type: "string", enum: ["em_andamento", "finalizada", "encerrada_etica"], description: "Current triage status. Set to 'encerrada_etica' if customer has a lawyer, 'finalizada' when triage is complete." }
                             },
                         }
                     }
@@ -121,7 +125,11 @@ class OpenaiService {
                             await chat.update({
                                 contactName: data.name || chat.contactName,
                                 cpf: data.cpf || chat.cpf,
-                                email: data.email || chat.email
+                                email: data.email || chat.email,
+                                hasLawyer: data.hasLawyer !== undefined ? data.hasLawyer : chat.hasLawyer,
+                                area: data.area || chat.area,
+                                notes: data.notes || chat.notes,
+                                triageStatus: data.triageStatus || chat.triageStatus
                             });
 
                             if (io) io.emit('chat_updated', chat);
