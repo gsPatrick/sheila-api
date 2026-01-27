@@ -27,9 +27,22 @@ class ZapiWebhookService {
 
         // 2b. Check if this is a Bot message (just sent by us)
         const isBot = zapiService.checkAndClearBotMessage(msgId);
-        if (isBot && isMsgFromMe) {
-            console.log(`🤖 Bot message confirmation (${msgId}). Skipping duplicate and deactivation logic.`);
-            return;
+
+        if (isMsgFromMe) {
+            if (isBot) {
+                console.log(`🤖 Bot message echo detected (ID: ${msgId}). Skipping deactivation.`);
+                return;
+            }
+            // Fallback: If it's from me but ID wasn't in cache, check if it's the same content as the last bot message
+            const lastMessage = await Message.findOne({
+                where: { ChatId: chat.id, isFromMe: true },
+                order: [['createdAt', 'DESC']]
+            });
+            if (lastMessage && lastMessage.body === body && (new Date() - lastMessage.createdAt) < 30000) {
+                console.log(`🤖 Bot message fallback detected (Content Match). Skipping deactivation.`);
+                return;
+            }
+            console.log(`👤 Manual human intervention detected. Message: "${body.substring(0, 20)}..."`);
         }
 
         // WHITE-LIST PARA TESTES (Restrito ao número do usuário)
@@ -94,10 +107,10 @@ class ZapiWebhookService {
 
         // 7. Desativação Automática da IA
         if (isMsgFromMe) {
-            // If sent from the synced phone, disable AI for this chat (to the recipient)
+            console.log(`🔴 Turning OFF AI for Chat ${chat.id} due to manual message.`);
             await chatService.updateAiStatus(chat.id, false);
             if (io) {
-                io.emit('chat_updated', chat);
+                io.emit('chat_updated', { ...chat.get(), isAiActive: false });
             }
             return;
         }
