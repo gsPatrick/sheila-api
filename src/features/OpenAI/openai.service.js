@@ -74,17 +74,18 @@ class OpenaiService {
                     type: "function",
                     function: {
                         name: "update_customer_data",
-                        description: "Extracts and saves customer data whenever the user provides information during the triage. Call this function every time you learn something new about the customer. Include all fields you know about, not just the new ones.",
+                        description: "CRITICAL: You MUST call this function every single time the user provides ANY new information during the conversation. This includes: name, CPF, CNPJ, email, whether they have a lawyer, which legal area they need help with, or any details about their case. Always include ALL previously known fields plus the new information. Never skip calling this function when the user answers a question.",
                         parameters: {
                             type: "object",
                             properties: {
                                 name: { type: "string", description: "Customer's full name" },
-                                cpf: { type: "string", description: "Customer's CPF/CNPJ (numbers only)" },
+                                cpf: { type: "string", description: "Customer's CPF or CNPJ (numbers only)" },
                                 email: { type: "string", description: "Customer's email address" },
                                 hasLawyer: { type: "boolean", description: "Whether the customer already has a lawyer for this case. true if yes, false if no." },
+                                lawyerResponse: { type: "string", description: "The exact phrase the user said about having or not having a lawyer" },
                                 area: { type: "string", enum: ["previdenciario", "trabalhista", "outro"], description: "The area of law the customer needs help with" },
-                                notes: { type: "string", description: "Summary of the conversation so far, including all relevant context like employment history, health issues, benefits status, etc." },
-                                triageStatus: { type: "string", enum: ["em_andamento", "finalizada", "encerrada_etica"], description: "Current triage status. Set to 'encerrada_etica' if customer has a lawyer, 'finalizada' when triage is complete." }
+                                notes: { type: "string", description: "Comprehensive summary of everything learned about the customer so far. Include: employment history, health issues, benefits status, case details, and all relevant context from the conversation." },
+                                triageStatus: { type: "string", enum: ["em_andamento", "finalizada", "encerrada_etica"], description: "Current triage status. Set to 'encerrada_etica' if customer has a lawyer, 'finalizada' when triage is complete and documents were requested." }
                             },
                         }
                     }
@@ -127,6 +128,7 @@ class OpenaiService {
                                 cpf: data.cpf || chat.cpf,
                                 email: data.email || chat.email,
                                 hasLawyer: data.hasLawyer !== undefined ? data.hasLawyer : chat.hasLawyer,
+                                lawyerResponse: data.lawyerResponse || chat.lawyerResponse,
                                 area: data.area || chat.area,
                                 notes: data.notes || chat.notes,
                                 triageStatus: data.triageStatus || chat.triageStatus

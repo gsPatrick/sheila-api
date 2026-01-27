@@ -52,6 +52,10 @@ const Chat = sequelize.define('Chat', {
         type: DataTypes.BOOLEAN,
         allowNull: true
     },
+    lawyerResponse: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
     area: {
         type: DataTypes.STRING, // 'previdenciario', 'trabalhista', 'outro'
         allowNull: true
