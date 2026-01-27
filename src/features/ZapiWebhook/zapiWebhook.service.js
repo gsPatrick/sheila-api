@@ -9,7 +9,8 @@ const path = require('path');
 
 class ZapiWebhookService {
     async process(payload, io) {
-        const { phone, fromMe, text, audio, type, senderName, instanceId } = payload;
+        const { phone, fromMe, text, audio, type, senderName, instanceId, messageId } = payload;
+        const msgId = messageId || payload.id; // Z-API variation
 
         // Ignore status updates (READ, RECEIVED, etc) and other non-message types
         if (type === 'MessageStatusCallback' || (type && type !== 'ReceivedCallback')) {
@@ -23,6 +24,13 @@ class ZapiWebhookService {
         const body = text?.message || '';
         const isAudio = type === 'ReceivedCallback' && audio;
         const isMsgFromMe = fromMe === true; // Force boolean
+
+        // 2b. Check if this is a Bot message (just sent by us)
+        const isBot = zapiService.checkAndClearBotMessage(msgId);
+        if (isBot && isMsgFromMe) {
+            console.log(`🤖 Bot message confirmation (${msgId}). Skipping duplicate processing.`);
+            return;
+        }
 
         // WHITE-LIST PARA TESTES (Restrito ao número do usuário)
         // Aceita formatos com ou sem o 9º dígito

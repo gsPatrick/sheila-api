@@ -2,6 +2,10 @@ const axios = require('axios');
 const settingsService = require('../Settings/settings.service');
 
 class ZapiService {
+    constructor() {
+        this.sentByBot = new Set();
+    }
+
     async sendMessage(toNumber, messageBody) {
         const instanceId = await settingsService.getByKey('zApiInstance');
         const token = await settingsService.getByKey('zApiToken');
@@ -28,6 +32,13 @@ class ZapiService {
                 { headers }
             );
             console.log('✅ Z-API Response:', response.data?.messageId || 'OK');
+
+            if (response.data?.messageId) {
+                this.sentByBot.add(response.data.messageId);
+                // Clear after 1 minute to avoid memory leaks
+                setTimeout(() => this.sentByBot.delete(response.data.messageId), 60000);
+            }
+
             return response.data;
         } catch (error) {
             console.error('Error sending message via Z-API:', error.response?.data || error.message);
@@ -59,6 +70,10 @@ class ZapiService {
                 },
                 { headers }
             );
+            if (response.data?.messageId) {
+                this.sentByBot.add(response.data.messageId);
+                setTimeout(() => this.sentByBot.delete(response.data.messageId), 60000);
+            }
             return response.data;
         } catch (error) {
             console.error('Error sending audio via Z-API:', error.response?.data || error.message);
@@ -101,6 +116,15 @@ class ZapiService {
         // Implement similar logic if needed for "List Messages" (Menu), 
         // but Button List is usually enough for Yes/No.
         return this.sendButtonList(toNumber, messageBody, distinctOptions);
+    }
+    checkAndClearBotMessage(messageId) {
+        if (!messageId) return false;
+        if (this.sentByBot.has(messageId)) {
+            // Keep it for 5 more seconds just in case of duplicate Status webhooks, but usually Received comes first
+            setTimeout(() => this.sentByBot.delete(messageId), 5000);
+            return true;
+        }
+        return false;
     }
 }
 
