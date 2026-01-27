@@ -65,7 +65,8 @@ class OpenaiService {
 
         const systemMessage = {
             role: 'system',
-            content: mainPrompt || 'Você é um assistente prestativo.'
+            content: (mainPrompt || 'Você é Carol, assistente de triagem jurídica.') +
+                '\n\nIMPORTANTE: Sempre que chamar a função update_customer_data, você deve obrigatoriamente preencher o campo "notes" com um resumo detalhado e atualizado da conversa até o momento.'
         };
 
         try {
@@ -87,6 +88,7 @@ class OpenaiService {
                                 notes: { type: "string", description: "Comprehensive summary of everything learned about the customer so far. Include: employment history, health issues, benefits status, case details, and all relevant context from the conversation." },
                                 triageStatus: { type: "string", enum: ["em_andamento", "finalizada", "encerrada_etica"], description: "Current triage status. Set to 'encerrada_etica' if customer has a lawyer, 'finalizada' when triage is complete and documents were requested." }
                             },
+                            required: ["notes"]
                         }
                     }
                 }
@@ -130,7 +132,7 @@ class OpenaiService {
                                 hasLawyer: data.hasLawyer !== undefined ? data.hasLawyer : chat.hasLawyer,
                                 lawyerResponse: data.lawyerResponse || chat.lawyerResponse,
                                 area: data.area || chat.area,
-                                notes: data.notes || chat.notes,
+                                notes: data.notes !== undefined ? data.notes : chat.notes,
                                 triageStatus: data.triageStatus || chat.triageStatus
                             });
 
