@@ -8,6 +8,7 @@ const blacklistRoutes = require('../features/Blacklist/blacklist.routes');
 const tramitacaoRoutes = require('../features/TramitacaoInteligente/tramitacaoInteligente.routes');
 
 const healthCheckRoutes = require('../features/HealthCheck/healthCheck.routes');
+const zapiRoutes = require('../features/ZapiWebhook/zapi.routes');
 
 module.exports = (io) => {
     router.use('/auth', authRoutes);
@@ -15,6 +16,7 @@ module.exports = (io) => {
     router.use('/settings', settingsRoutes);
     router.use('/blacklist', blacklistRoutes);
     router.use('/ti', tramitacaoRoutes);
+    router.use('/zapi', zapiRoutes);
     router.use('/health-check', healthCheckRoutes);
 
     return router;

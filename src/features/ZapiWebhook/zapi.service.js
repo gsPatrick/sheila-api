@@ -117,6 +117,67 @@ class ZapiService {
         // but Button List is usually enough for Yes/No.
         return this.sendButtonList(toNumber, messageBody, distinctOptions);
     }
+
+    async listInstances() {
+        const clientToken = await settingsService.getByKey('zApiClientToken');
+        if (!clientToken) throw new Error('Z-API Client Token not configured');
+
+        try {
+            const response = await axios.get('https://api.z-api.io/instances', {
+                headers: { 'Client-Token': clientToken }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error listing Z-API instances:', error.response?.data || error.message);
+            throw new Error('Failed to list Z-API instances');
+        }
+    }
+
+    async getStatus(instanceId, token) {
+        const clientToken = await settingsService.getByKey('zApiClientToken');
+        const baseUrl = `https://api.z-api.io/instances/${instanceId}/token/${token}`;
+
+        try {
+            const response = await axios.get(`${baseUrl}/status`, {
+                headers: { 'Client-Token': clientToken }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error getting Z-API status:', error.response?.data || error.message);
+            throw new Error('Failed to get Z-API status');
+        }
+    }
+
+    async getQrCode(instanceId, token) {
+        const clientToken = await settingsService.getByKey('zApiClientToken');
+        const baseUrl = `https://api.z-api.io/instances/${instanceId}/token/${token}`;
+
+        try {
+            const response = await axios.get(`${baseUrl}/qr-code/image`, {
+                headers: { 'Client-Token': clientToken }
+            });
+            return response.data; // Expecting { value: "base64..." }
+        } catch (error) {
+            console.error('Error getting Z-API QR code:', error.response?.data || error.message);
+            throw new Error(error.response?.data?.message || 'Failed to get Z-API QR code');
+        }
+    }
+
+    async logout(instanceId, token) {
+        const clientToken = await settingsService.getByKey('zApiClientToken');
+        const baseUrl = `https://api.z-api.io/instances/${instanceId}/token/${token}`;
+
+        try {
+            const response = await axios.get(`${baseUrl}/logout`, {
+                headers: { 'Client-Token': clientToken }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error logging out Z-API instance:', error.response?.data || error.message);
+            throw new Error('Failed to logout Z-API instance');
+        }
+    }
+
     checkAndClearBotMessage(messageId) {
         if (!messageId) return false;
         if (this.sentByBot.has(messageId)) {
