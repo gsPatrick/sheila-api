@@ -42,8 +42,9 @@ class BlacklistService {
     }
 
     async isBlacklisted(phoneNumber) {
-        const blacklisted = await Blacklist.findOne({ where: { phoneNumber } });
-        return !!blacklisted;
+        // Find all blacklisted numbers and check if the incoming one ends with any of them
+        const blacklistedItems = await Blacklist.findAll({ attributes: ['phoneNumber'] });
+        return blacklistedItems.some(item => phoneNumber.endsWith(item.phoneNumber));
     }
 }
 

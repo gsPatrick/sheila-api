@@ -17,6 +17,12 @@ class ZapiWebhookService {
             return;
         }
 
+        // 1b. Ignore GROUPS and Broadcast lists
+        if (phone && (phone.includes('-') || phone.includes('@g.us'))) {
+            console.log(`👥 Group/Broadcast message ignored from ${phone}`);
+            return;
+        }
+
         console.log(`📩 Webhook Received [ID: ${msgId}] from ${phone} (fromMe: ${fromMe}): ${text?.message?.substring(0, 30)}...`);
 
         // 2. Extração de Dados
@@ -24,6 +30,12 @@ class ZapiWebhookService {
         const body = text?.message || '';
         const isAudio = type === 'ReceivedCallback' && audio;
         const isMsgFromMe = fromMe === true || fromMe === 'true'; // Handle string bool
+
+        // 2c. Ignore empty messages (non-audio)
+        if (!body && !isAudio && !isMsgFromMe) {
+            console.log(`ℹ️ Empty message from ${contactNumber} ignored.`);
+            return;
+        }
 
         // 2b. Check if this is a Bot message (just sent by us)
         const isBot = zapiService.checkAndClearBotMessage(msgId);
