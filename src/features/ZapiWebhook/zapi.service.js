@@ -120,16 +120,35 @@ class ZapiService {
 
     async listInstances() {
         const clientToken = await settingsService.getByKey('zApiClientToken');
+
         if (!clientToken) throw new Error('Z-API Client Token not configured');
 
         try {
+            console.log('🔍 Calling Z-API /instances...');
             const response = await axios.get('https://api.z-api.io/instances', {
-                headers: { 'Client-Token': clientToken }
+                headers: {
+                    'Client-Token': clientToken
+                }
             });
             return response.data;
         } catch (error) {
-            console.error('Error listing Z-API instances:', error.response?.data || error.message);
-            throw new Error('Failed to list Z-API instances');
+            const zapiError = error.response?.data;
+            console.error('❌ Z-API Error Response:', JSON.stringify(zapiError));
+
+            // If the standard endpoint fails with Auth error, try the integrator one
+            if (zapiError?.error === 'Authorization token is empty' || error.response?.status === 401) {
+                try {
+                    console.log('🔄 Retrying with integrator endpoint...');
+                    const retryRes = await axios.get('https://api.z-api.io/instances/integrator/all', {
+                        headers: { 'Client-Token': clientToken }
+                    });
+                    return retryRes.data;
+                } catch (retryError) {
+                    console.error('❌ Integrator Endpoint also failed:', retryError.response?.data || retryError.message);
+                }
+            }
+
+            throw new Error(zapiError?.error || zapiError?.message || 'Failed to list Z-API instances');
         }
     }
 
