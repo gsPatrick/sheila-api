@@ -71,12 +71,16 @@ class OpenaiService {
 ### CONTEXTO ATUAL DO CLIENTE (O QUE JÁ SABEMOS):
 - Nome: ${chat.contactName || 'Não informado'}
 - CPF/CNPJ: ${chat.cpf || 'Não informado'}
-- E-mail: ${chat.email || 'Não informado'}
-- Possui Advogado: ${chat.hasLawyer === true ? 'Sim' : chat.hasLawyer === false ? 'Não' : 'Não perguntado'}
-- Área: ${chat.area || 'Não definida'}
-- Resumo/Notas Atuais: ${chat.notes || 'Nenhuma nota registrada'}
+### CONTAGEM DE NOTAS (TEMPLATE OBRIGATÓRIO):
+Sempre que preencher o campo 'notes', você deve usar EXATAMENTE este formato:
+Nome: [Nome Completo]
+CPF: [CPF ou CNPJ]
+E-mail: [Melhor E-mail]
+Área Jurídica: [Previdenciário, Trabalhista ou Outro]
+Possui Advogado: [Sim/Não] (Resposta: [Frase do cliente])
+Resumo do Caso: [Bloco de texto único descrevendo o histórico e problema do cliente]
 
-IMPORTANTE: Sempre que chamar a função update_customer_data, você deve preencher o campo 'notes' com os novos fatos e observações relevantes. O sistema irá anexar isso ao histórico de forma cumulativa. NUNCA apague informações anteriores, o sistema cuida da anexação.`
+IMPORTANTE: Forneça sempre o bloco COMPLETO e ATUALIZADO em cada chamada. Não use separadores como '---' nem repita blocos antigos.`
         };
 
         try {
@@ -135,14 +139,9 @@ IMPORTANTE: Sempre que chamar a função update_customer_data, você deve preenc
                             const data = JSON.parse(toolCall.function.arguments);
                             console.log(`💾 AI extracted data:`, data);
 
-                            // Lógica de Notas Cumulativas: Se a nota nova for diferente da atual, anexa.
-                            let finalNotes = chat.notes;
-                            if (data.notes && data.notes !== chat.notes) {
-                                // Se a nota nova já estiver contida na antiga (IA repetindo resumo), não duplica
-                                if (!chat.notes || !chat.notes.includes(data.notes)) {
-                                    finalNotes = chat.notes ? `${chat.notes}\n---\n${data.notes}` : data.notes;
-                                }
-                            }
+                            // Voltamos para notas consolidadas conforme pedido do usuário
+                            // A IA agora é responsável por manter um bloco único e organizado.
+                            const finalNotes = data.notes || chat.notes;
 
                             await chat.update({
                                 contactName: data.name || chat.contactName,
