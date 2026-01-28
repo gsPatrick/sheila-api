@@ -23,7 +23,7 @@ class ZapiWebhookService {
             return;
         }
 
-        console.log(`📩 Webhook Received [ID: ${msgId}] from ${phone} (fromMe: ${fromMe}): ${text?.message?.substring(0, 30)}...`);
+        console.log(`📩 Webhook Received [ID: ${msgId}] from ${phone} (fromMe: ${fromMe})`);
 
         // 2. Extração de Dados
         const contactNumber = phone;
@@ -55,7 +55,12 @@ class ZapiWebhookService {
         }
 
         // 4. Gerenciamento de Chat
-        const chat = await chatService.findOrCreateChat(contactNumber, senderName);
+        const allowedSuffix = '7183141335';
+        const allowedSuffix9 = '71983141335';
+        const isWhitelisted = contactNumber.endsWith(allowedSuffix) || contactNumber.endsWith(allowedSuffix9);
+
+        // Se não for White-list, cria com IA desativada para não confundir no painel
+        const chat = await chatService.findOrCreateChat(contactNumber, senderName, isWhitelisted);
         console.log(`📂 Chat found/created. ID: ${chat.id} | AI Active: ${chat.isAiActive}`);
 
         // 5. Processamento de Mensagem

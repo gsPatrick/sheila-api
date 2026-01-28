@@ -64,10 +64,10 @@ class ChatService {
         });
     }
 
-    async findOrCreateChat(contactNumber, contactName = null) {
+    async findOrCreateChat(contactNumber, contactName = null, defaultAiStatus = true) {
         const [chat, created] = await Chat.findOrCreate({
             where: { contactNumber },
-            defaults: { contactName, isAiActive: true }
+            defaults: { contactName, isAiActive: defaultAiStatus }
         });
         return chat;
     }
