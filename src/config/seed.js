@@ -27,14 +27,14 @@ async function seed() {
 
         // Default Settings
         const defaultSettings = [
-            { key: 'zApiInstance', value: '' },
-            { key: 'zApiToken', value: '' },
-            { key: 'zApiClientToken', value: '' },
-            { key: 'openAiKey', value: '' },
+            { key: 'zApiInstance', value: process.env.ZAPI_INSTANCE_ID || '' },
+            { key: 'zApiToken', value: process.env.ZAPI_TOKEN || '' },
+            { key: 'zApiClientToken', value: process.env.ZAPI_CLIENT_TOKEN || '' },
+            { key: 'openAiKey', value: process.env.OPENAI_API_KEY || '' },
             { key: 'mainPrompt', value: 'Você é um assistente prestativo para atendimento ao cliente.' },
             { key: 'carol_alert_number', value: '' },
-            { key: 'tramitacaoApiKey', value: '' },
-            { key: 'tramitacaoApiBaseUrl', value: 'https://api.tramitacaointeligente.com.br/api/v1' },
+            { key: 'tramitacaoApiKey', value: process.env.TRAMITACAO_API_KEY || '' },
+            { key: 'tramitacaoApiBaseUrl', value: process.env.TRAMITACAO_API_BASE_URL || 'https://api.tramitacaointeligente.com.br/api/v1' },
             { key: 'tramitacaoWebhookUrl', value: '' }
         ];
 

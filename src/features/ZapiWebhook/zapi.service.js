@@ -125,28 +125,38 @@ class ZapiService {
 
         if (clientToken) clientToken = clientToken.trim();
 
-        console.log('🔍 Listing Instances - Token length:', clientToken?.length);
+        console.log('🔍 Listing Z-API Instances - Token length:', clientToken?.length);
 
         let data = null;
         if (clientToken) {
+            // Try 1: Standard with Client-Token
             try {
-                console.log('🔍 Calling Z-API /instances...');
-                const response = await axios.get('https://api.z-api.io/instances', {
-                    headers: { 'client-token': clientToken }
+                const res = await axios.get('https://api.z-api.io/instances', {
+                    headers: { 'Client-Token': clientToken }
                 });
-                data = response.data;
-            } catch (error) {
-                const zapiError = error.response?.data;
-                console.error('❌ Z-API Error Response:', JSON.stringify(zapiError));
-
+                data = res.data;
+                console.log('✅ Z-API /instances Success');
+            } catch (e1) {
+                console.log('⚠️ Z-API /instances Failed, trying integrator...');
+                // Try 2: Integrator endpoint
                 try {
-                    console.log('🔄 Retrying with integrator endpoint...');
-                    const retryRes = await axios.get('https://api.z-api.io/instances/integrator/all', {
+                    const res = await axios.get('https://api.z-api.io/instances/integrator/all', {
                         headers: { 'Client-Token': clientToken }
                     });
-                    data = retryRes.data;
-                } catch (retryError) {
-                    console.error('❌ Integrator Endpoint also failed');
+                    data = res.data;
+                    console.log('✅ Z-API /integrator Success');
+                } catch (e2) {
+                    console.log('⚠️ Z-API /integrator Failed, trying with Authorization header...');
+                    // Try 3: Standard with Authorization header
+                    try {
+                        const res = await axios.get('https://api.z-api.io/instances', {
+                            headers: { 'Authorization': `Bearer ${clientToken}` }
+                        });
+                        data = res.data;
+                        console.log('✅ Z-API /instances (Bearer) Success');
+                    } catch (e3) {
+                        console.error('❌ All listing attempts failed');
+                    }
                 }
             }
         }
@@ -155,14 +165,13 @@ class ZapiService {
         if (Array.isArray(data)) instancesList = data;
         else if (data && Array.isArray(data.content)) instancesList = data.content;
 
-        // Fallback to default instance if list is empty
         if (instancesList.length === 0 && defaultInstanceId && defaultInstanceToken) {
-            console.log('💡 Using default instance as fallback');
+            console.log('💡 Fallback: Using default instance');
             instancesList.push({
                 instanceId: defaultInstanceId,
                 token: defaultInstanceToken,
                 name: 'Instância Local (Configurada)',
-                connected: false // Status will be checked by individual status call
+                connected: false
             });
         }
 
@@ -170,7 +179,9 @@ class ZapiService {
     }
 
     async getStatus(instanceId, token) {
-        const clientToken = await settingsService.getByKey('zApiClientToken');
+        let clientToken = await settingsService.getByKey('zApiClientToken');
+        if (clientToken) clientToken = clientToken.trim();
+
         const baseUrl = `https://api.z-api.io/instances/${instanceId}/token/${token}`;
 
         try {
@@ -179,7 +190,20 @@ class ZapiService {
             });
             return response.data;
         } catch (error) {
-            console.error('Error getting Z-API status:', error.response?.data || error.message);
+            const errData = error.response?.data;
+            console.error(`❌ Z-API Status Error (${instanceId}):`, JSON.stringify(errData || error.message));
+
+            // If it fails due to Client-Token, try WITHOUT it (many instances work without it)
+            if (errData?.error?.includes('client-token') || error.response?.status === 401) {
+                try {
+                    console.log('🔄 Retrying status WITHOUT Client-Token header...');
+                    const retryRes = await axios.get(`${baseUrl}/status`);
+                    return retryRes.data;
+                } catch (retryError) {
+                    console.error('❌ Status retry also failed');
+                }
+            }
+
             throw new Error('Failed to get Z-API status');
         }
     }
