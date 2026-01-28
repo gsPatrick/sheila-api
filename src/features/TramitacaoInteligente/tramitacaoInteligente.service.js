@@ -43,6 +43,7 @@ class TramitacaoInteligenteService {
         };
 
         try {
+            console.log(`📡 Creating customer in TI: ${baseUrl}/clientes`);
             const response = await axios.post(`${baseUrl}/clientes`, customerData, { headers });
 
             const createdCustomer = response.data.customer || response.data;
@@ -55,7 +56,12 @@ class TramitacaoInteligenteService {
 
             return chat;
         } catch (error) {
-            console.error('Error creating customer in TI:', error.response?.data || error.message);
+            console.error('❌ Error creating customer in TI:', {
+                url: `${baseUrl}/clientes`,
+                status: error.response?.status,
+                data: error.response?.data,
+                message: error.message
+            });
             throw new Error('Failed to create customer in Tramitacao Inteligente');
         }
     }
@@ -93,10 +99,16 @@ class TramitacaoInteligenteService {
         };
 
         try {
+            console.log(`📝 Creating note in TI: ${baseUrl}/notas`);
             const response = await axios.post(`${baseUrl}/notas`, noteData, { headers });
             return response.data;
         } catch (error) {
-            console.error('Error creating note in TI:', error.response?.data || error.message);
+            console.error('❌ Error creating note in TI:', {
+                url: `${baseUrl}/notas`,
+                status: error.response?.status,
+                data: error.response?.data,
+                message: error.message
+            });
             throw new Error('Failed to create note in Tramitacao Inteligente');
         }
     }
@@ -105,15 +117,23 @@ class TramitacaoInteligenteService {
     async searchCustomers(cpfCnpj) {
         const headers = await this.getHeaders();
         const baseUrl = await this.getBaseUrl();
+        const url = `${baseUrl}/clientes`;
 
         try {
-            const response = await axios.get(`${baseUrl}/clientes`, {
+            console.log(`🔍 Searching customers in TI: ${url} (CPF: ${cpfCnpj})`);
+            const response = await axios.get(url, {
                 headers,
                 params: { cpf_cnpj: cpfCnpj }
             });
             return response.data;
         } catch (error) {
-            console.error('Error searching customers in TI:', error.response?.data || error.message);
+            console.error('❌ Error searching customers in TI:', {
+                url,
+                params: { cpf_cnpj: cpfCnpj },
+                status: error.response?.status,
+                data: error.response?.data,
+                message: error.message
+            });
             throw new Error('Failed to search customers in Tramitacao Inteligente');
         }
     }
