@@ -1,6 +1,7 @@
 const { Chat } = require('../../models');
 const { Op } = require('sequelize');
-const axios = require('axios');
+const axios = require('axios').default || require('axios');
+console.log('AXIOS LOADED in TramitacaoService:', typeof axios);
 const settingsService = require('../Settings/settings.service');
 
 class TramitacaoInteligenteService {
