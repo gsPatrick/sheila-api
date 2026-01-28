@@ -33,16 +33,7 @@ class ZapiWebhookService {
             return;
         }
 
-        // WHITE-LIST PARA TESTES (Restrito ao número do usuário)
-        // Aceita formatos com ou sem o 9º dígito
-        const allowedSuffix = '7183141335';
-        const allowedSuffix9 = '71983141335';
 
-        if (!isMsgFromMe && !contactNumber.endsWith(allowedSuffix) && !contactNumber.endsWith(allowedSuffix9)) {
-            console.log(`❌ Contact ${contactNumber} BLOCKED by Whitelist. Ignoring.`);
-            return;
-        }
-        console.log(`✅ Contact ${contactNumber} passed Whitelist.`);
 
         // 3. Verificação da Blacklist
         const isBlacklisted = await blacklistService.isBlacklisted(contactNumber);
@@ -103,9 +94,18 @@ class ZapiWebhookService {
             return;
         }
 
-        // 8. Acionamento da IA
+        // 8. Acionamento da IA (Com White-list para testes)
         if (chat.isAiActive && !isMsgFromMe) {
-            console.log('🤖 AI Active. Triggering Response Generation...');
+            // WHITE-LIST PARA TESTES (Restrito ao número do usuário)
+            const allowedSuffix = '7183141335';
+            const allowedSuffix9 = '71983141335';
+
+            if (!contactNumber.endsWith(allowedSuffix) && !contactNumber.endsWith(allowedSuffix9)) {
+                console.log(`⏭️ AI Trigger BLOCKED by Whitelist for ${contactNumber}. Persistence OK.`);
+                return;
+            }
+
+            console.log('🤖 AI Active and Whitelisted. Triggering Response Generation...');
             // Generate AI response
             openaiService.generateResponse(chat.id, io).catch(err => console.error('❌ GPT error:', err));
         } else {
