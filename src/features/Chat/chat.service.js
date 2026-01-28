@@ -20,6 +20,18 @@ class ChatService {
             where.isAiActive = query.isAiActive === 'true' || query.isAiActive === true;
         }
 
+        if (query.syncStatus) {
+            if (query.syncStatus === 'Sincronizado') {
+                where.syncStatus = 'Sincronizado';
+            } else {
+                where.syncStatus = { [Op.or]: [null, 'Pendente', ''] };
+            }
+        }
+
+        if (query.triageStatus) {
+            where.triageStatus = query.triageStatus;
+        }
+
         const { count, rows } = await Chat.findAndCountAll({
             where,
             limit,

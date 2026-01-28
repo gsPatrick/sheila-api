@@ -4,6 +4,7 @@ const { Chat, AlertLog } = require('../../models');
 const settingsService = require('../Settings/settings.service');
 
 const crypto = require('crypto');
+const { Op } = require('sequelize');
 
 class TramitacaoInteligenteController {
     // REST Endpoints
@@ -90,6 +91,15 @@ class TramitacaoInteligenteController {
         }
     }
 
+    async syncAll(req, res) {
+        try {
+            const result = await tramitacaoService.syncAllTICustomers();
+            return res.json(result);
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+
     async getAlerts(req, res) {
         const { page = 1, limit = 20, isRead } = req.query;
         const offset = (page - 1) * limit;
@@ -138,7 +148,21 @@ class TramitacaoInteligenteController {
                 const carolNumber = await settingsService.getByKey('carol_alert_number');
 
                 for (const pub of publications) {
-                    const { texto, numero_processo, link_tramitacao } = pub;
+                    const { texto, numero_processo, link_tramitacao, destinatarios } = pub;
+
+                    // Tentar encontrar o ChatId associado por nome do destinatário
+                    let foundChatId = null;
+                    if (destinatarios && destinatarios.length > 0) {
+                        const names = destinatarios.map(d => d.nome);
+                        const chat = await Chat.findOne({
+                            where: {
+                                contactName: {
+                                    [Op.in]: names
+                                }
+                            }
+                        });
+                        if (chat) foundChatId = chat.id;
+                    }
 
                     // Persistir no Banco de Dados
                     const newAlert = await AlertLog.create({
@@ -146,6 +170,7 @@ class TramitacaoInteligenteController {
                         processNumber: numero_processo,
                         body: texto,
                         link: link_tramitacao,
+                        ChatId: foundChatId,
                         rawPayload: pub
                     });
 
@@ -171,8 +196,31 @@ class TramitacaoInteligenteController {
                     const chat = await Chat.findOne({ where: { tramitacaoCustomerUuid: customer.uuid } });
                     if (chat) {
                         // Sync relevant fields
-                        const updateData = {};
-                        if (customer.name) updateData.contactName = customer.name;
+                        const updateData = {
+                            contactName: customer.name || chat.contactName,
+                            cpf: (customer.cpf_cnpj || '').replace(/\D/g, '') || chat.cpf,
+                            email: customer.email || chat.email,
+                            phone_1: customer.phone_1,
+                            phone_2: customer.phone_2,
+                            country: customer.country,
+                            state: customer.state,
+                            city: customer.city,
+                            neighborhood: customer.neighborhood,
+                            zipcode: customer.zipcode,
+                            street: customer.street,
+                            street_number: customer.street_number,
+                            sexo: customer.sexo,
+                            birthdate: customer.birthdate,
+                            deathdate: customer.deathdate,
+                            marital_status: customer.marital_status,
+                            profession: customer.profession,
+                            meu_inss_pass: customer.meu_inss_pass,
+                            rg_numero: customer.rg_numero,
+                            rg_data_emissao: customer.rg_data_emissao,
+                            father_name: customer.father_name,
+                            mother_name: customer.mother_name,
+                            syncStatus: 'Sincronizado'
+                        };
 
                         await chat.update(updateData);
 

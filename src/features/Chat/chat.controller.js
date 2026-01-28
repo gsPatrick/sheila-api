@@ -8,9 +8,9 @@ class ChatController {
     }
 
     async index(req, res) {
-        const { search, page, limit, isAiActive } = req.query;
+        const { search, page, limit, isAiActive, syncStatus, triageStatus } = req.query;
         try {
-            const result = await chatService.getAll({ search, isAiActive }, page, limit);
+            const result = await chatService.getAll({ search, isAiActive, syncStatus, triageStatus }, page, limit);
             return res.json(result);
         } catch (error) {
             return res.status(500).json({ error: error.message });

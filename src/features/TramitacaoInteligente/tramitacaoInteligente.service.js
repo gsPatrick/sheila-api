@@ -1,5 +1,5 @@
-const axios = require('axios');
 const { Chat } = require('../../models');
+const { Op } = require('sequelize');
 const settingsService = require('../Settings/settings.service');
 
 class TramitacaoInteligenteService {
@@ -68,7 +68,29 @@ class TramitacaoInteligenteService {
                 tramitacaoCustomerId: id,
                 tramitacaoCustomerUuid: uuid,
                 cpf: cleanCpf,
-                contactName: manualData.name || chat.contactName
+                contactName: manualData.name || chat.contactName,
+                // Full fields sync
+                email: manualData.email || chat.email,
+                phone_1: manualData.phone_1 || '',
+                phone_2: manualData.phone_2 || '',
+                country: manualData.country || '',
+                state: manualData.state || '',
+                city: manualData.city || '',
+                neighborhood: manualData.neighborhood || '',
+                zipcode: manualData.zipcode || '',
+                street: manualData.street || '',
+                street_number: manualData.street_number || '',
+                sexo: manualData.sexo || '',
+                birthdate: manualData.birthdate || null,
+                deathdate: manualData.deathdate || null,
+                marital_status: manualData.marital_status || '',
+                profession: manualData.profession || '',
+                meu_inss_pass: manualData.meu_inss_pass || '',
+                rg_numero: manualData.rg_numero || '',
+                rg_data_emissao: manualData.rg_data_emissao || null,
+                father_name: manualData.father_name || '',
+                mother_name: manualData.mother_name || '',
+                syncStatus: 'Sincronizado'
             });
 
             return chat;
@@ -239,6 +261,88 @@ class TramitacaoInteligenteService {
         } catch (error) {
             console.error('Error fetching customer from TI:', error.response?.data || error.message);
             throw new Error('Failed to fetch customer from Tramitacao Inteligente');
+        }
+    }
+    async syncAllTICustomers() {
+        const headers = await this.getHeaders();
+        const baseUrl = await this.getBaseUrl();
+        let allCustomers = [];
+        let page = 1;
+        let totalPages = 1;
+
+        try {
+            do {
+                console.log(`📡 Fetching TI customers page ${page}...`);
+                const response = await axios.get(`${baseUrl}/clientes`, {
+                    headers,
+                    params: { page, per_page: 100 }
+                });
+
+                const { customers, pagination } = response.data;
+                allCustomers = allCustomers.concat(customers);
+                totalPages = pagination.pages;
+                page++;
+            } while (page <= totalPages);
+
+            console.log(`✅ Fetched ${allCustomers.length} customers from TI. Syncing to local DB...`);
+
+            for (const customer of allCustomers) {
+                const cleanCpf = (customer.cpf_cnpj || '').replace(/\D/g, '');
+
+                // Try to find local chat by TI ID or CPF
+                let chat = await Chat.findOne({
+                    where: {
+                        [Op.or]: [
+                            { tramitacaoCustomerId: customer.id },
+                            { cpf: cleanCpf }
+                        ]
+                    }
+                });
+
+                const updatePayload = {
+                    tramitacaoCustomerId: customer.id,
+                    tramitacaoCustomerUuid: customer.uuid,
+                    contactName: customer.name || chat.contactName,
+                    cpf: cleanCpf || chat.cpf,
+                    email: customer.email || chat.email,
+                    phone_1: customer.phone_1,
+                    phone_2: customer.phone_2,
+                    country: customer.country,
+                    state: customer.state,
+                    city: customer.city,
+                    neighborhood: customer.neighborhood,
+                    zipcode: customer.zipcode,
+                    street: customer.street,
+                    street_number: customer.street_number,
+                    sexo: customer.sexo,
+                    birthdate: customer.birthdate,
+                    deathdate: customer.deathdate,
+                    marital_status: customer.marital_status,
+                    profession: customer.profession,
+                    meu_inss_pass: customer.meu_inss_pass,
+                    rg_numero: customer.rg_numero,
+                    rg_data_emissao: customer.rg_data_emissao,
+                    father_name: customer.father_name,
+                    mother_name: customer.mother_name,
+                    syncStatus: 'Sincronizado'
+                };
+
+                if (chat) {
+                    // Update existing
+                    await chat.update(updatePayload);
+                } else {
+                    // Create new local entry if it doesn't exist
+                    await Chat.create({
+                        ...updatePayload,
+                        contactNumber: `TI_${customer.id}` // Placeholder identifier
+                    });
+                }
+            }
+
+            return { count: allCustomers.length };
+        } catch (error) {
+            console.error('❌ Error syncing TI customers:', error.message);
+            throw new Error('Failed to sync customers from Tramitacao Inteligente');
         }
     }
 }

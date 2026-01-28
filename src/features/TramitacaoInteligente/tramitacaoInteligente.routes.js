@@ -14,6 +14,7 @@ router.patch('/customer/:chatId', tramitacaoController.updateCustomer.bind(trami
 router.post('/note', tramitacaoController.createNote.bind(tramitacaoController));
 router.get('/customer/search', tramitacaoController.search.bind(tramitacaoController));
 router.get('/customer/:chatId/full', tramitacaoController.getFullCustomer.bind(tramitacaoController));
+router.post('/sync-all', tramitacaoController.syncAll.bind(tramitacaoController));
 
 // New Notes Routes
 router.get('/notes/:chatId', tramitacaoController.getNotes.bind(tramitacaoController));
