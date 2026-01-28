@@ -118,7 +118,7 @@ class TramitacaoInteligenteService {
         const baseUrl = await this.getBaseUrl();
 
         try {
-            const response = await axios.patch(`${baseUrl}/clientes/${chat.tramitacaoCustomerId}`, updateData, { headers });
+            const response = await axios.patch(`${baseUrl}/clientes/${chat.tramitacaoCustomerId}`, { cliente: updateData }, { headers });
 
             // Update local sync time
             await chat.update({ lastSyncAt: new Date() });

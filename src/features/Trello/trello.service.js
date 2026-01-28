@@ -59,7 +59,7 @@ class TrelloService {
         return null;
     }
 
-    async createTrelloCard(chatId) {
+    async syncTrelloCard(chatId) {
         const chat = await Chat.findByPk(chatId);
         if (!chat) return null;
 
@@ -71,6 +71,10 @@ class TrelloService {
         }
 
         const { key, token, boardId } = creds;
+
+        // Find existing card first
+        let card = await this.findTrelloCard(chat.contactNumber);
+
         const title = `${chat.contactName?.toUpperCase() || 'CLIENTE NOVO'} - ${chat.contactNumber}`;
 
         // Helper to slugify name for the URL
@@ -123,22 +127,37 @@ ${chat.notes || 'Nenhuma nota disponível.'}
                 l.name.toLowerCase().includes(chat.area?.toLowerCase() || 'none')
             );
 
-            const response = await axios.post(`https://api.trello.com/1/cards`, null, {
-                params: {
-                    key,
-                    token,
-                    idList: listId,
-                    name: title,
-                    desc: description,
-                    pos: 'top',
-                    idLabels: matchingLabel ? matchingLabel.id : undefined
-                }
-            });
-
-            console.log(`✅ Trello Card created: ${response.data.shortUrl}`);
-            return response.data;
+            if (card) {
+                // UPDATE existing card
+                await axios.put(`https://api.trello.com/1/cards/${card.id}`, null, {
+                    params: {
+                        key,
+                        token,
+                        name: title,
+                        desc: description,
+                        idLabels: matchingLabel ? matchingLabel.id : undefined
+                    }
+                });
+                console.log(`✅ Trello Card updated: ${card.shortUrl}`);
+                return card;
+            } else {
+                // CREATE new card
+                const response = await axios.post(`https://api.trello.com/1/cards`, null, {
+                    params: {
+                        key,
+                        token,
+                        idList: listId,
+                        name: title,
+                        desc: description,
+                        pos: 'top',
+                        idLabels: matchingLabel ? matchingLabel.id : undefined
+                    }
+                });
+                console.log(`✅ Trello Card created: ${response.data.shortUrl}`);
+                return response.data;
+            }
         } catch (error) {
-            console.error('❌ Trello creation error:', error.response?.data || error.message);
+            console.error('❌ Trello sync error:', error.response?.data || error.message);
             return null;
         }
     }

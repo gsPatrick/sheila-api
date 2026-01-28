@@ -1,6 +1,8 @@
 const chatService = require('./chat.service');
 const zapiService = require('../ZapiWebhook/zapi.service');
-const { Message } = require('../../models');
+const { Message, Chat } = require('../../models');
+const tramitacaoService = require('../TramitacaoInteligente/tramitacaoInteligente.service');
+const trelloService = require('../Trello/trello.service');
 
 class ChatController {
     constructor(io) {
@@ -40,6 +42,28 @@ class ChatController {
         const { id } = req.params;
         try {
             const chat = await chatService.updateChat(id, req.body);
+
+            // AUTO SYNC - TI & TRELLO
+            try {
+                // TI Sync
+                if (chat.tramitacaoCustomerId) {
+                    // We pass the updated chat data directly. 
+                    // IMPORTANT: Ensure fields match what updateCustomer expects (which are basically chat fields)
+                    // Since updateCustomer in service filters or maps, we can pass req.body or the chat object
+                    // Looking at service, it sends updateData directly. The fields in formData in frontend match TI fields generally.
+                    await tramitacaoService.updateCustomer(id, req.body);
+                    console.log(`✅ TI Synced for Chat ${id}`);
+                }
+
+                // Trello Sync
+                await trelloService.syncTrelloCard(id);
+                console.log(`✅ Trello Synced for Chat ${id}`);
+
+            } catch (syncError) {
+                console.error('⚠️ Sync Error (TI/Trello):', syncError.message);
+                // We do NOT fail the request if sync fails, just log it.
+            }
+
             return res.json(chat);
         } catch (error) {
             return res.status(500).json({ error: error.message });
