@@ -11,7 +11,11 @@ class SettingsService {
         'tramitacaoApiBaseUrl': 'TRAMITACAO_API_BASE_URL',
         'tramitacaoWebhookUrl': 'TRAMITACAO_WEBHOOK_URL',
         'tramitacaoWebhookSecret': 'TRAMITACAO_WEBHOOK_SECRET',
-        'carol_alert_number': 'CAROL_ALERT_NUMBER'
+        'carol_alert_number': 'CAROL_ALERT_NUMBER',
+        'trelloKey': 'TRELLO_KEY',
+        'trelloToken': 'TRELLO_TOKEN',
+        'trelloBoardId': 'TRELLO_BOARD_ID',
+        'trelloListId': 'TRELLO_LIST_ID'
     };
 
     async getAll() {

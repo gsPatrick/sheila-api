@@ -112,6 +112,16 @@ class ZapiWebhookService {
             io.emit('new_message', { message: newMessage, chat });
         }
 
+        // 📋 Trello Integration: Add comment if card exists
+        if (!isMsgFromMe && body) {
+            const trelloService = require('../Trello/trello.service');
+            trelloService.findTrelloCard(contactNumber).then(card => {
+                if (card) {
+                    trelloService.addComment(card.id, body);
+                }
+            }).catch(e => console.error('❌ Trello comment match error:', e.message));
+        }
+
         // 7. Desativação Automática da IA
         if (isMsgFromMe) {
             console.log(`🔴 Turning OFF AI for Chat ${chat.id} due to manual message.`);

@@ -58,6 +58,17 @@ Sempre que o cliente fornecer uma informação nova, você deve chamar a funçã
 
 - **Status da Triagem**: Quando chegar na "MENSAGEM DE ENCERRAMENTO", defina o campo "triageStatus" como 'finalizada'. Se o cliente tiver advogado, defina como 'encerrada_etica'.
 
+## CAPACIDADE DE CONSULTA DE PROCESSOS (PÓS-TRIAGEM)
+Carol, agora você tem acesso ao portal **Tramitação Inteligente (TI)**.
+- Se o cliente perguntar "Como está meu processo?", "Alguma novidade?", ou similar, você **DEVE** chamar a função `get_process_status`.
+- Ao receber os dados do processo, explique para o cliente de forma simples o que está acontecendo (últimas movimentações).
+- Caso o sistema retorne erro ou diga que não está vinculado, peça educadamente para o cliente aguardar que um advogado fará o vínculo manual em breve.
+
+## ESTADO DE CONVERSA LIVRE
+- Após a triagem ser finalizada (`triageStatus: 'finalizada'`), você entra em modo de suporte.
+- Você pode responder dúvidas gerais sobre o escritório, prazos médios (mencione que variam caso a caso) e orientar sobre o envio de documentos.
+- Mantenha o tom profissional e empático.
+
 ## FLUXO DE TRIAGEM (Passo a Passo)
 
 ### FASE 0: MENSAGEM DE BOAS-VINDAS E COLETA INICIAL
@@ -128,39 +139,39 @@ Já reunimos todas as informações iniciais para a Dra. Sheila e a equipe. Agor
 Você pode ir enviando os que tiver aqui mesmo, sem pressa! A equipe jurídica vai analisar tudo com atenção e retornar em até 48h úteis com a avaliação completa.
 Fique tranquilo(a), vamos cuidar do seu caso!`
             },
-            { key: 'carol_alert_number', value: '' },
-            { key: 'tramitacaoApiKey', value: process.env.TRAMITACAO_API_KEY || '' },
-            { key: 'tramitacaoApiBaseUrl', value: process.env.TRAMITACAO_API_BASE_URL || 'https://api.tramitacaointeligente.com.br/api/v1' },
-            { key: 'tramitacaoWebhookUrl', value: '' }
+    { key: 'carol_alert_number', value: '' },
+    { key: 'tramitacaoApiKey', value: process.env.TRAMITACAO_API_KEY || '' },
+    { key: 'tramitacaoApiBaseUrl', value: process.env.TRAMITACAO_API_BASE_URL || 'https://api.tramitacaointeligente.com.br/api/v1' },
+    { key: 'tramitacaoWebhookUrl', value: '' }
         ];
 
-        for (const s of settings) {
-            await Setting.create(s);
-        }
-        console.log('⚙️ Configurações iniciais importadas do .env');
-
-        // 3. Criar Chats Mock (Opcional)
-        const mockChats = [
-            { contactNumber: '71982862912', contactName: 'Patrick Siqueira', isAiActive: true },
-        ];
-
-        for (const c of mockChats) {
-            const chat = await Chat.create(c);
-            await Message.create({
-                ChatId: chat.id,
-                body: 'Olá! Sistema resetado e pronto para uso.',
-                isFromMe: true,
-                timestamp: new Date()
-            });
-        }
-        console.log('💬 Chats de teste criados');
-
-        console.log('\n✨ Tudo pronto! O banco de dados foi limpo e reconfigurado.');
-        process.exit(0);
-    } catch (error) {
-        console.error('❌ Erro no reset/seed:', error);
-        process.exit(1);
+    for (const s of settings) {
+        await Setting.create(s);
     }
+    console.log('⚙️ Configurações iniciais importadas do .env');
+
+    // 3. Criar Chats Mock (Opcional)
+    const mockChats = [
+        { contactNumber: '71982862912', contactName: 'Patrick Siqueira', isAiActive: true },
+    ];
+
+    for (const c of mockChats) {
+        const chat = await Chat.create(c);
+        await Message.create({
+            ChatId: chat.id,
+            body: 'Olá! Sistema resetado e pronto para uso.',
+            isFromMe: true,
+            timestamp: new Date()
+        });
+    }
+    console.log('💬 Chats de teste criados');
+
+    console.log('\n✨ Tudo pronto! O banco de dados foi limpo e reconfigurado.');
+    process.exit(0);
+} catch (error) {
+    console.error('❌ Erro no reset/seed:', error);
+    process.exit(1);
+}
 }
 
 resetAndSeed();

@@ -4,6 +4,7 @@ const FormData = require('form-data');
 const settingsService = require('../Settings/settings.service');
 const { Message, Chat } = require('../../models');
 const zapiService = require('../ZapiWebhook/zapi.service');
+const tramitacaoService = require('../TramitacaoInteligente/tramitacaoInteligente.service');
 
 class OpenaiService {
     async transcribeAudio(messageId, audioPath) {
@@ -71,6 +72,7 @@ class OpenaiService {
 ### CONTEXTO ATUAL DO CLIENTE (O QUE JÁ SABEMOS):
 - Nome: ${chat.contactName || 'Não informado'}
 - CPF/CNPJ: ${chat.cpf || 'Não informado'}
+- Status da Triagem: ${chat.triageStatus || 'em_andamento'}
 ### CONTAGEM DE NOTAS (TEMPLATE OBRIGATÓRIO):
 Sempre que preencher o campo 'notes', você deve usar EXATAMENTE este formato:
 Nome: [Nome Completo]
@@ -103,6 +105,18 @@ IMPORTANTE: Forneça sempre o bloco COMPLETO e ATUALIZADO em cada chamada. Não 
                                 triageStatus: { type: "string", enum: ["em_andamento", "finalizada", "encerrada_etica"], description: "Current triage status. Set to 'encerrada_etica' if customer has a lawyer, 'finalizada' when triage is complete and documents were requested." }
                             },
                             required: ["notes"]
+                        }
+                    }
+                },
+                {
+                    type: "function",
+                    function: {
+                        name: "get_process_status",
+                        description: "Fetches the current status and latest updates of the customer's legal processes from Tramitação Inteligente. Use this only when the customer asks about their process or case progress.",
+                        parameters: {
+                            type: "object",
+                            properties: {},
+                            required: []
                         }
                     }
                 }
@@ -153,6 +167,51 @@ IMPORTANTE: Forneça sempre o bloco COMPLETO e ATUALIZADO em cada chamada. Não 
                                 triageStatus: data.triageStatus || chat.triageStatus
                             });
 
+                            // 🔄 Auto-Sync to TI Portal: Trigger as soon as core data is captured
+                            const hasCoreData = (data.name || chat.contactName) && (data.cpf || chat.cpf) && (data.email || chat.email);
+                            if (hasCoreData && !chat.tramitacaoCustomerId) {
+                                console.log(`🚀 Core data captured for ${data.name || chat.contactName}. Triggering auto-sync to TI...`);
+                                tramitacaoService.searchCustomers(data.cpf || chat.cpf).then(async (result) => {
+                                    const cleanInputCpf = (data.cpf || chat.cpf).replace(/\D/g, '');
+                                    const existing = result.customers?.find(c => c.cpf_cnpj?.replace(/\D/g, '') === cleanInputCpf);
+
+                                    if (existing) {
+                                        console.log(`🔗 Existing customer found in TI (ID: ${existing.id}). Linking...`);
+                                        await chat.update({
+                                            tramitacaoCustomerId: existing.id,
+                                            tramitacaoCustomerUuid: existing.uuid,
+                                            syncStatus: 'Sincronizado'
+                                        });
+                                    } else {
+                                        console.log(`✨ No existing customer found. Creating in TI...`);
+                                        await tramitacaoService.createCustomer(chat.id, {
+                                            name: data.name || chat.contactName,
+                                            cpf_cnpj: data.cpf || chat.cpf,
+                                            email: data.email || chat.email
+                                        });
+                                    }
+
+                                    if (finalNotes) {
+                                        tramitacaoService.upsertNote(chat.id, finalNotes).catch(e =>
+                                            console.error('❌ Failed to push initial note:', e.message)
+                                        );
+                                    }
+                                }).catch(e => console.error('❌ TI Auto-sync error:', e.message));
+                            } else if (finalNotes && chat.tramitacaoCustomerId) {
+                                // Regular note update if already synced
+                                tramitacaoService.upsertNote(chat.id, finalNotes).catch(e =>
+                                    console.error('❌ Failed to auto-sync note to TI:', e.message)
+                                );
+                            }
+
+                            // 📋 Trello Integration: Create card on finalization
+                            if (data.triageStatus === 'finalizada' || data.triageStatus === 'encerrada_etica') {
+                                const trelloService = require('../Trello/trello.service');
+                                trelloService.createTrelloCard(chat.id).catch(e =>
+                                    console.error('❌ Failed to create Trello card:', e.message)
+                                );
+                            }
+
                             if (io) io.emit('chat_updated', chat.get({ plain: true }));
 
                             // Push tool result to messages with details
@@ -163,7 +222,27 @@ IMPORTANTE: Forneça sempre o bloco COMPLETO e ATUALIZADO em cada chamada. Não 
                                 content: `Updated fields: ${Object.keys(data).join(', ')}. Data saved successfully.`
                             });
                         } catch (e) {
-                            console.error('Error in tool execution:', e);
+                            console.error('Error in tool execution (update_customer_data):', e);
+                        }
+                    } else if (toolCall.function.name === 'get_process_status') {
+                        try {
+                            console.log(`🔍 AI requested process status for Chat ${chatId}`);
+                            const dossier = await tramitacaoService.getDossier(chatId);
+
+                            currentMessages.push({
+                                role: 'tool',
+                                tool_call_id: toolCall.id,
+                                name: 'get_process_status',
+                                content: JSON.stringify(dossier)
+                            });
+                        } catch (e) {
+                            console.error('Error in tool execution (get_process_status):', e.message);
+                            currentMessages.push({
+                                role: 'tool',
+                                tool_call_id: toolCall.id,
+                                name: 'get_process_status',
+                                content: `Error: ${e.message}. Inform the customer that their case is not yet linked or there was a connection issue with the portal.`
+                            });
                         }
                     }
                 }

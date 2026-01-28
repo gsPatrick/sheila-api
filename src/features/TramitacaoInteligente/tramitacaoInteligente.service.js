@@ -345,6 +345,48 @@ class TramitacaoInteligenteService {
             throw new Error('Failed to sync customers from Tramitacao Inteligente');
         }
     }
+
+    async getDossier(chatId) {
+        const chat = await Chat.findByPk(chatId);
+        if (!chat || !chat.tramitacaoCustomerId) {
+            throw new Error('Chat not found or not linked to TI');
+        }
+
+        const headers = await this.getHeaders();
+        const baseUrl = await this.getBaseUrl();
+
+        try {
+            console.log(`📡 Fetching Full Dossier for TI ID: ${chat.tramitacaoCustomerId}`);
+            // The TI API usually provides basic info at /clientes/{id} 
+            // and more detailed process info might require /processos or similar depending on their API.
+            // Based on previous knowledge, /clientes/{id} returns the customer with embedded dossiers/processes.
+            const response = await axios.get(`${baseUrl}/clientes/${chat.tramitacaoCustomerId}`, { headers });
+
+            // Return only what the AI needs to avoid token bloat
+            const customer = response.data.customer || response.data;
+            return {
+                name: customer.name,
+                cpf_cnpj: customer.cpf_cnpj,
+                processes: customer.processes || [],
+                movements: customer.last_movements || []
+            };
+        } catch (error) {
+        }
+    }
+
+    async upsertNote(chatId, content, userId = null) {
+        // Search for an existing "Carol IA" note to update, or create a new one
+        const existingNotes = await this.getCustomerNotes(chatId);
+        const triageNote = existingNotes.notes?.find(n => n.content.includes('Nome:') && n.content.includes('Área Jurídica:'));
+
+        if (triageNote) {
+            console.log(`📝 Updating existing Triage Note ${triageNote.id} in TI`);
+            return this.updateNote(triageNote.id, content, userId);
+        } else {
+            console.log(`📝 Creating new Triage Note in TI`);
+            return this.createNote(chatId, content, userId);
+        }
+    }
 }
 
 module.exports = new TramitacaoInteligenteService();
