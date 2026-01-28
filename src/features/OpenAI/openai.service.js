@@ -66,7 +66,17 @@ class OpenaiService {
         const systemMessage = {
             role: 'system',
             content: (mainPrompt || 'Você é Carol, assistente de triagem jurídica.') +
-                '\n\nIMPORTANTE: Sempre que chamar a função update_customer_data, você deve obrigatoriamente preencher o campo "notes" com um resumo detalhado e atualizado da conversa até o momento.'
+                `
+
+### CONTEXTO ATUAL DO CLIENTE (O QUE JÁ SABEMOS):
+- Nome: ${chat.contactName || 'Não informado'}
+- CPF/CNPJ: ${chat.cpf || 'Não informado'}
+- E-mail: ${chat.email || 'Não informado'}
+- Possui Advogado: ${chat.hasLawyer === true ? 'Sim' : chat.hasLawyer === false ? 'Não' : 'Não perguntado'}
+- Área: ${chat.area || 'Não definida'}
+- Resumo/Notas Atuais: ${chat.notes || 'Nenhuma nota registrada'}
+
+IMPORTANTE: Sempre que chamar a função update_customer_data, você deve preencher o campo 'notes' com os novos fatos e observações relevantes. O sistema irá anexar isso ao histórico de forma cumulativa. NUNCA apague informações anteriores, o sistema cuida da anexação.`
         };
 
         try {
@@ -125,6 +135,15 @@ class OpenaiService {
                             const data = JSON.parse(toolCall.function.arguments);
                             console.log(`💾 AI extracted data:`, data);
 
+                            // Lógica de Notas Cumulativas: Se a nota nova for diferente da atual, anexa.
+                            let finalNotes = chat.notes;
+                            if (data.notes && data.notes !== chat.notes) {
+                                // Se a nota nova já estiver contida na antiga (IA repetindo resumo), não duplica
+                                if (!chat.notes || !chat.notes.includes(data.notes)) {
+                                    finalNotes = chat.notes ? `${chat.notes}\n---\n${data.notes}` : data.notes;
+                                }
+                            }
+
                             await chat.update({
                                 contactName: data.name || chat.contactName,
                                 cpf: data.cpf || chat.cpf,
@@ -132,7 +151,7 @@ class OpenaiService {
                                 hasLawyer: data.hasLawyer !== undefined ? data.hasLawyer : chat.hasLawyer,
                                 lawyerResponse: data.lawyerResponse || chat.lawyerResponse,
                                 area: data.area || chat.area,
-                                notes: data.notes !== undefined ? data.notes : chat.notes,
+                                notes: finalNotes,
                                 triageStatus: data.triageStatus || chat.triageStatus
                             });
 
