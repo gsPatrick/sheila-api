@@ -68,9 +68,20 @@ class ZapiWebhookService {
         if (isAudio) {
             const audioUrl = audio.audioUrl;
             const fileName = `audio_${Date.now()}.ogg`;
-            const filePath = path.join(__dirname, '../../../uploads/audio', fileName);
+            const uploadDir = path.join(__dirname, '../../../uploads/audio');
+            const filePath = path.join(uploadDir, fileName);
 
-            await this.downloadFile(audioUrl, filePath);
+            // Ensure directory exists
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+
+            try {
+                await this.downloadFile(audioUrl, filePath);
+            } catch (error) {
+                console.error('❌ Failed to download audio file:', error.message);
+                return; // Prevent crash
+            }
 
             newMessage = await Message.create({
                 ChatId: chat.id,

@@ -8,6 +8,19 @@ const sequelize = require('./src/config/database');
 const routes = require('./src/routes');
 const zapiWebhookRoutes = require('./src/features/ZapiWebhook/zapiWebhook.routes');
 const tramitacaoController = require('./src/features/TramitacaoInteligente/tramitacaoInteligente.controller');
+const fs = require('fs');
+
+// Ensure upload directories exist
+const uploadDirs = [
+    path.join(__dirname, 'uploads'),
+    path.join(__dirname, 'uploads/audio')
+];
+uploadDirs.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`📁 Created directory: ${dir}`);
+    }
+});
 
 const app = express();
 const server = http.createServer(app);
