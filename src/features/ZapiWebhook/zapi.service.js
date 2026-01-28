@@ -9,39 +9,51 @@ class ZapiService {
     async sendMessage(toNumber, messageBody) {
         const instanceId = await settingsService.getByKey('zApiInstance');
         const token = await settingsService.getByKey('zApiToken');
-        const clientToken = await settingsService.getByKey('zApiClientToken');
+        let clientToken = await settingsService.getByKey('zApiClientToken');
 
-        if (!instanceId || !token || !clientToken) {
-            throw new Error('Z-API credentials not configured in settings');
+        if (clientToken) clientToken = clientToken.trim();
+
+        if (!instanceId || !token) {
+            throw new Error('Z-API instanceId or token not configured');
         }
 
         const baseUrl = `https://api.z-api.io/instances/${instanceId}/token/${token}`;
-        const headers = {
-            'Content-Type': 'application/json',
-            'Client-Token': clientToken
-        };
+        const headers = { 'Content-Type': 'application/json' };
+        if (clientToken) headers['Client-Token'] = clientToken;
 
         try {
-            console.log(`📤 Sending Text to ${toNumber}: "${messageBody.substring(0, 30)}..."`);
+            console.log(`📤 Sending Text to ${toNumber} (Instance: ${instanceId})`);
             const response = await axios.post(
                 `${baseUrl}/send-text`,
-                {
-                    phone: toNumber,
-                    message: messageBody
-                },
+                { phone: toNumber, message: messageBody },
                 { headers }
             );
-            console.log('✅ Z-API Response:', response.data?.messageId || 'OK');
+            console.log('✅ Message sent successfully');
 
             if (response.data?.messageId) {
                 this.sentByBot.add(response.data.messageId);
-                // Clear after 1 minute to avoid memory leaks
                 setTimeout(() => this.sentByBot.delete(response.data.messageId), 60000);
             }
 
             return response.data;
         } catch (error) {
-            console.error('Error sending message via Z-API:', error.response?.data || error.message);
+            const errData = error.response?.data;
+            console.error('❌ Error sending message:', JSON.stringify(errData || error.message));
+
+            // If failed due to client-token, try WITHOUT it
+            if (clientToken && (errData?.error?.includes('token') || error.response?.status === 401)) {
+                try {
+                    console.log('🔄 Retrying sendMessage WITHOUT Client-Token header...');
+                    const retryRes = await axios.post(
+                        `${baseUrl}/send-text`,
+                        { phone: toNumber, message: messageBody },
+                        { headers: { 'Content-Type': 'application/json' } }
+                    );
+                    return retryRes.data;
+                } catch (retryError) {
+                    console.error('❌ Retry sendMessage also failed');
+                }
+            }
             throw new Error('Failed to send message via Z-API');
         }
     }
@@ -49,25 +61,23 @@ class ZapiService {
     async sendAudio(toNumber, audioUrl) {
         const instanceId = await settingsService.getByKey('zApiInstance');
         const token = await settingsService.getByKey('zApiToken');
-        const clientToken = await settingsService.getByKey('zApiClientToken');
+        let clientToken = await settingsService.getByKey('zApiClientToken');
 
-        if (!instanceId || !token || !clientToken) {
-            throw new Error('Z-API credentials not configured in settings');
+        if (clientToken) clientToken = clientToken.trim();
+
+        if (!instanceId || !token) {
+            throw new Error('Z-API credentials missing');
         }
 
         const baseUrl = `https://api.z-api.io/instances/${instanceId}/token/${token}`;
-        const headers = {
-            'Content-Type': 'application/json',
-            'Client-Token': clientToken
-        };
+        const headers = { 'Content-Type': 'application/json' };
+        if (clientToken) headers['Client-Token'] = clientToken;
 
         try {
+            console.log(`📤 Sending Audio to ${toNumber}`);
             const response = await axios.post(
                 `${baseUrl}/send-audio`,
-                {
-                    phone: toNumber,
-                    audio: audioUrl
-                },
+                { phone: toNumber, audio: audioUrl },
                 { headers }
             );
             if (response.data?.messageId) {
@@ -76,7 +86,20 @@ class ZapiService {
             }
             return response.data;
         } catch (error) {
-            console.error('Error sending audio via Z-API:', error.response?.data || error.message);
+            const errData = error.response?.data;
+            console.error('❌ Error sending audio:', JSON.stringify(errData || error.message));
+
+            if (clientToken && (errData?.error?.includes('token') || error.response?.status === 401)) {
+                try {
+                    console.log('🔄 Retrying sendAudio WITHOUT Client-Token...');
+                    const retryRes = await axios.post(
+                        `${baseUrl}/send-audio`,
+                        { phone: toNumber, audio: audioUrl },
+                        { headers: { 'Content-Type': 'application/json' } }
+                    );
+                    return retryRes.data;
+                } catch (e) { console.error('❌ Audio retry failed'); }
+            }
             throw new Error('Failed to send audio via Z-API');
         }
     }
@@ -84,15 +107,17 @@ class ZapiService {
     async sendButtonList(toNumber, messageBody, buttons) {
         const instanceId = await settingsService.getByKey('zApiInstance');
         const token = await settingsService.getByKey('zApiToken');
-        const clientToken = await settingsService.getByKey('zApiClientToken');
+        let clientToken = await settingsService.getByKey('zApiClientToken');
 
-        if (!instanceId || !token || !clientToken) throw new Error('Z-API credentials missing');
+        if (clientToken) clientToken = clientToken.trim();
+        if (!instanceId || !token) throw new Error('Z-API credentials missing');
 
         const baseUrl = `https://api.z-api.io/instances/${instanceId}/token/${token}`;
-        const headers = { 'Content-Type': 'application/json', 'Client-Token': clientToken };
+        const headers = { 'Content-Type': 'application/json' };
+        if (clientToken) headers['Client-Token'] = clientToken;
 
         try {
-            // buttons structure: [{ id: '1', label: 'Yes' }, ...]
+            console.log(`📤 Sending Buttons to ${toNumber}`);
             const response = await axios.post(
                 `${baseUrl}/send-button-list`,
                 {
@@ -106,8 +131,28 @@ class ZapiService {
             );
             return response.data;
         } catch (error) {
-            console.error('Error sending buttons via Z-API:', error.response?.data || error.message);
-            // Fallback to text if buttons fail (e.g. not supported on some clients)
+            const errData = error.response?.data;
+            console.error('❌ Error sending buttons:', JSON.stringify(errData || error.message));
+
+            if (clientToken && (errData?.error?.includes('token') || error.response?.status === 401)) {
+                try {
+                    console.log('🔄 Retrying sendButtons WITHOUT Client-Token...');
+                    const retryRes = await axios.post(
+                        `${baseUrl}/send-button-list`,
+                        {
+                            phone: toNumber,
+                            message: messageBody,
+                            buttonList: {
+                                buttons: buttons.map(b => ({ id: b.id, label: b.label }))
+                            }
+                        },
+                        { headers: { 'Content-Type': 'application/json' } }
+                    );
+                    return retryRes.data;
+                } catch (e) { console.error('❌ Buttons retry failed'); }
+            }
+
+            // Fallback to text
             return this.sendMessage(toNumber, `${messageBody}\n\nOpções:\n${buttons.map(b => `- ${b.label}`).join('\n')}`);
         }
     }
