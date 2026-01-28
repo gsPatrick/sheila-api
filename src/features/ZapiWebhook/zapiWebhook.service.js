@@ -56,9 +56,8 @@ class ZapiWebhookService {
         }
 
         // 4. Gerenciamento de Chat
-        const allowedSuffix = '7183141335';
-        const allowedSuffix9 = '71983141335';
-        const isWhitelisted = contactNumber.endsWith(allowedSuffix) || contactNumber.endsWith(allowedSuffix9);
+        const allowedSuffixes = ['7183141335', '71983141335', '11968070834', '968070834'];
+        const isWhitelisted = allowedSuffixes.some(suffix => contactNumber.endsWith(suffix));
 
         // Se não for White-list, cria com IA desativada para não confundir no painel
         const chat = await chatService.findOrCreateChat(contactNumber, senderName, isWhitelisted);
@@ -152,10 +151,8 @@ class ZapiWebhookService {
         // 8. Acionamento da IA (Com White-list para testes)
         if (chat.isAiActive && !isMsgFromMe) {
             // WHITE-LIST PARA TESTES (Restrito ao número do usuário)
-            const allowedSuffix = '7183141335';
-            const allowedSuffix9 = '71983141335';
-
-            if (!contactNumber.endsWith(allowedSuffix) && !contactNumber.endsWith(allowedSuffix9)) {
+            const allowedSuffixes = ['7183141335', '71983141335', '11968070834', '968070834'];
+            if (!allowedSuffixes.some(suffix => contactNumber.endsWith(suffix))) {
                 console.log(`⏭️ AI Trigger BLOCKED by Whitelist for ${contactNumber}. Persistence OK.`);
                 return;
             }
