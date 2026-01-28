@@ -154,7 +154,7 @@ IMPORTANTE: Forneça sempre o bloco COMPLETO e ATUALIZADO em cada chamada. Não 
                                 triageStatus: data.triageStatus || chat.triageStatus
                             });
 
-                            if (io) io.emit('chat_updated', chat);
+                            if (io) io.emit('chat_updated', chat.get({ plain: true }));
 
                             // Push tool result to messages with details
                             currentMessages.push({
