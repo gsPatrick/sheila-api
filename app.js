@@ -53,7 +53,7 @@ io.on('connection', (socket) => {
 // Database sync and server start
 const PORT = process.env.PORT || 3000;
 
-sequelize.sync({ force: false }).then(() => {
+sequelize.sync({ alter: true }).then(() => {
     console.log('Database connected and synced');
     server.listen(PORT, () => {
         console.log(`Server running on port ${PORT}`);
