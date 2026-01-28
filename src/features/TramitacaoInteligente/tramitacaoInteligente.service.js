@@ -92,7 +92,8 @@ class TramitacaoInteligenteService {
                 rg_data_emissao: manualData.rg_data_emissao || null,
                 father_name: manualData.father_name || '',
                 mother_name: manualData.mother_name || '',
-                syncStatus: 'Sincronizado'
+                syncStatus: 'Sincronizado',
+                lastSyncAt: new Date()
             });
 
             return chat;
@@ -118,6 +119,10 @@ class TramitacaoInteligenteService {
 
         try {
             const response = await axios.patch(`${baseUrl}/clientes/${chat.tramitacaoCustomerId}`, updateData, { headers });
+
+            // Update local sync time
+            await chat.update({ lastSyncAt: new Date() });
+
             return response.data;
         } catch (error) {
             console.error('Error updating customer in TI:', error.response?.data || error.message);
@@ -325,8 +330,10 @@ class TramitacaoInteligenteService {
                     rg_numero: customer.rg_numero,
                     rg_data_emissao: customer.rg_data_emissao,
                     father_name: customer.father_name,
+                    father_name: customer.father_name,
                     mother_name: customer.mother_name,
-                    syncStatus: 'Sincronizado'
+                    syncStatus: 'Sincronizado',
+                    lastSyncAt: new Date()
                 };
 
                 if (chat) {

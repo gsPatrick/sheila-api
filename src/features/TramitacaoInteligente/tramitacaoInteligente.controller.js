@@ -219,7 +219,8 @@ class TramitacaoInteligenteController {
                             rg_data_emissao: customer.rg_data_emissao,
                             father_name: customer.father_name,
                             mother_name: customer.mother_name,
-                            syncStatus: 'Sincronizado'
+                            syncStatus: 'Sincronizado',
+                            lastSyncAt: new Date()
                         };
 
                         await chat.update(updateData);
