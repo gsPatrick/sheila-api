@@ -123,33 +123,38 @@ class ZapiService {
 
         if (!clientToken) throw new Error('Z-API Client Token not configured');
 
+        let data;
         try {
             console.log('🔍 Calling Z-API /instances...');
             const response = await axios.get('https://api.z-api.io/instances', {
-                headers: {
-                    'Client-Token': clientToken
-                }
+                headers: { 'Client-Token': clientToken }
             });
-            return response.data;
+            data = response.data;
         } catch (error) {
             const zapiError = error.response?.data;
             console.error('❌ Z-API Error Response:', JSON.stringify(zapiError));
 
-            // If the standard endpoint fails with Auth error, try the integrator one
             if (zapiError?.error === 'Authorization token is empty' || error.response?.status === 401) {
                 try {
                     console.log('🔄 Retrying with integrator endpoint...');
                     const retryRes = await axios.get('https://api.z-api.io/instances/integrator/all', {
                         headers: { 'Client-Token': clientToken }
                     });
-                    return retryRes.data;
+                    data = retryRes.data;
                 } catch (retryError) {
                     console.error('❌ Integrator Endpoint also failed:', retryError.response?.data || retryError.message);
+                    throw new Error('Unauthorized or invalid Z-API Client Token');
                 }
+            } else {
+                throw new Error(zapiError?.error || zapiError?.message || 'Failed to list Z-API instances');
             }
-
-            throw new Error(zapiError?.error || zapiError?.message || 'Failed to list Z-API instances');
         }
+
+        // Normalize response: Z-API sometimes returns { content: [...] } or just [...]
+        if (Array.isArray(data)) return data;
+        if (data && Array.isArray(data.content)) return data.content;
+
+        return [];
     }
 
     async getStatus(instanceId, token) {
