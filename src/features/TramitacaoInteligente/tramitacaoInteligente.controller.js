@@ -29,9 +29,41 @@ class TramitacaoInteligenteController {
     }
 
     async createNote(req, res) {
-        const { chatId, content } = req.body;
+        const { chatId, content, userId } = req.body;
         try {
-            const data = await tramitacaoService.createNotaTriagem(chatId, content);
+            const data = await tramitacaoService.createNote(chatId, content, userId);
+            return res.json(data);
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+
+    async updateNote(req, res) {
+        const { id } = req.params;
+        const { content, userId } = req.body;
+        try {
+            const data = await tramitacaoService.updateNote(id, content, userId);
+            return res.json(data);
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+
+    async deleteNote(req, res) {
+        const { id } = req.params;
+        try {
+            const data = await tramitacaoService.deleteNote(id);
+            return res.json(data);
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+
+    async getNotes(req, res) {
+        const { chatId } = req.params;
+        const { page = 1 } = req.query;
+        try {
+            const data = await tramitacaoService.getCustomerNotes(chatId, page);
             return res.json(data);
         } catch (error) {
             return res.status(500).json({ error: error.message });
@@ -39,9 +71,9 @@ class TramitacaoInteligenteController {
     }
 
     async search(req, res) {
-        const { cpfCnpj } = req.query;
+        const { cpfCnpj, q } = req.query;
         try {
-            const data = await tramitacaoService.searchCustomers(cpfCnpj);
+            const data = await tramitacaoService.searchCustomers(q || cpfCnpj);
             return res.json(data);
         } catch (error) {
             return res.status(500).json({ error: error.message });

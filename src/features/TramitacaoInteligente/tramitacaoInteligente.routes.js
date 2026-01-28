@@ -15,6 +15,11 @@ router.post('/note', tramitacaoController.createNote.bind(tramitacaoController))
 router.get('/customer/search', tramitacaoController.search.bind(tramitacaoController));
 router.get('/customer/:chatId/full', tramitacaoController.getFullCustomer.bind(tramitacaoController));
 
+// New Notes Routes
+router.get('/notes/:chatId', tramitacaoController.getNotes.bind(tramitacaoController));
+router.patch('/note/:id', tramitacaoController.updateNote.bind(tramitacaoController));
+router.delete('/note/:id', tramitacaoController.deleteNote.bind(tramitacaoController));
+
 // Alerts Management
 router.get('/alerts', tramitacaoController.getAlerts.bind(tramitacaoController));
 router.put('/alerts/:id/read', tramitacaoController.markAlertAsRead.bind(tramitacaoController));

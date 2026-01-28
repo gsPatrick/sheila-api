@@ -21,24 +21,39 @@ class TramitacaoInteligenteService {
     }
 
     // A. Serviços de Escrita
-    async createCustomer(chatId) {
+    async createCustomer(chatId, manualData = {}) {
         const chat = await Chat.findByPk(chatId);
         if (!chat) throw new Error('Chat not found');
 
-        if (!chat.cpf) throw new Error('CPF is required to create a customer in Tramitacao Inteligente');
+        const cpf = manualData.cpf_cnpj || chat.cpf;
+        if (!cpf) throw new Error('CPF is required to create a customer in Tramitacao Inteligente');
 
         const headers = await this.getHeaders();
         const baseUrl = await this.getBaseUrl();
 
-        // Ensure proper phone format (only digits)
-        const cleanPhone = chat.contactNumber ? chat.contactNumber.replace(/\D/g, '') : '';
-        const cleanCpf = chat.cpf.replace(/\D/g, '');
+        const cleanPhone = (manualData.phone_mobile || chat.contactNumber || '').replace(/\D/g, '');
+        const cleanCpf = cpf.replace(/\D/g, '');
 
         const customerData = {
             customer: {
-                name: chat.contactName || 'Cliente WhatsApp',
+                name: manualData.name || chat.contactName || 'Cliente WhatsApp',
                 phone_mobile: cleanPhone,
-                cpf_cnpj: cleanCpf
+                cpf_cnpj: cleanCpf,
+                email: manualData.email || chat.email || '',
+                sexo: manualData.sexo || '',
+                birthdate: manualData.birthdate || null,
+                meu_inss_pass: manualData.meu_inss_pass || '',
+                mother_name: manualData.mother_name || '',
+                father_name: manualData.father_name || '',
+                profession: manualData.profession || '',
+                marital_status: manualData.marital_status || '',
+                rg_numero: manualData.rg_numero || '',
+                state: manualData.state || '',
+                city: manualData.city || '',
+                neighborhood: manualData.neighborhood || '',
+                zipcode: manualData.zipcode || '',
+                street: manualData.street || '',
+                street_number: manualData.street_number || ''
             }
         };
 
@@ -51,7 +66,9 @@ class TramitacaoInteligenteService {
 
             await chat.update({
                 tramitacaoCustomerId: id,
-                tramitacaoCustomerUuid: uuid
+                tramitacaoCustomerUuid: uuid,
+                cpf: cleanCpf,
+                contactName: manualData.name || chat.contactName
             });
 
             return chat;
@@ -62,7 +79,7 @@ class TramitacaoInteligenteService {
                 data: error.response?.data,
                 message: error.message
             });
-            throw new Error('Failed to create customer in Tramitacao Inteligente');
+            throw new Error(error.response?.data?.errors?.join(', ') || 'Failed to create customer in Tramitacao Inteligente');
         }
     }
 
@@ -84,7 +101,7 @@ class TramitacaoInteligenteService {
         }
     }
 
-    async createNotaTriagem(chatId, triagemContent) {
+    async createNote(chatId, content, userId = null) {
         const chat = await Chat.findByPk(chatId);
         if (!chat || !chat.tramitacaoCustomerId) {
             throw new Error('Chat not found or not linked to TI');
@@ -93,43 +110,112 @@ class TramitacaoInteligenteService {
         const headers = await this.getHeaders();
         const baseUrl = await this.getBaseUrl();
 
+        // If no userId provided, attempt to use the first user from the organization
+        let targetUserId = userId;
+        if (!targetUserId) {
+            try {
+                const usersRes = await axios.get(`${baseUrl}/usuarios`, { headers });
+                targetUserId = usersRes.data.users?.[0]?.id;
+            } catch (e) {
+                console.error('Error fetching TI users:', e.message);
+            }
+        }
+
         const noteData = {
-            customer_id: chat.tramitacaoCustomerId,
-            content: triagemContent
+            note: {
+                customer_id: chat.tramitacaoCustomerId,
+                content: content,
+                user_id: targetUserId
+            }
         };
 
         try {
-            console.log(`📝 Creating note in TI: ${baseUrl}/notas`);
             const response = await axios.post(`${baseUrl}/notas`, noteData, { headers });
             return response.data;
         } catch (error) {
-            console.error('❌ Error creating note in TI:', {
-                url: `${baseUrl}/notas`,
-                status: error.response?.status,
-                data: error.response?.data,
-                message: error.message
-            });
+            console.error('Error creating note in TI:', error.response?.data || error.message);
             throw new Error('Failed to create note in Tramitacao Inteligente');
         }
     }
 
+    async updateNote(noteId, content, userId = null) {
+        const headers = await this.getHeaders();
+        const baseUrl = await this.getBaseUrl();
+
+        const noteData = {
+            note: {
+                content: content
+            }
+        };
+        if (userId) noteData.note.user_id = userId;
+
+        try {
+            const response = await axios.patch(`${baseUrl}/notas/${noteId}`, noteData, { headers });
+            return response.data;
+        } catch (error) {
+            console.error('Error updating note in TI:', error.response?.data || error.message);
+            throw new Error('Failed to update note in Tramitacao Inteligente');
+        }
+    }
+
+    async deleteNote(noteId) {
+        const headers = await this.getHeaders();
+        const baseUrl = await this.getBaseUrl();
+
+        try {
+            await axios.delete(`${baseUrl}/notas/${noteId}`, { headers });
+            return { success: true };
+        } catch (error) {
+            console.error('Error deleting note from TI:', error.response?.data || error.message);
+            throw new Error('Failed to delete note from Tramitacao Inteligente');
+        }
+    }
+
+    async getCustomerNotes(chatId, page = 1) {
+        const chat = await Chat.findByPk(chatId);
+        if (!chat || !chat.tramitacaoCustomerId) {
+            return { notes: [], pagination: {} };
+        }
+
+        const headers = await this.getHeaders();
+        const baseUrl = await this.getBaseUrl();
+
+        try {
+            const response = await axios.get(`${baseUrl}/notas`, {
+                headers,
+                params: {
+                    customer_id: chat.tramitacaoCustomerId,
+                    page
+                }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching notes from TI:', error.response?.data || error.message);
+            throw new Error('Failed to fetch notes from Tramitacao Inteligente');
+        }
+    }
+
     // B. Serviços de Leitura
-    async searchCustomers(cpfCnpj) {
+    async searchCustomers(query) {
         const headers = await this.getHeaders();
         const baseUrl = await this.getBaseUrl();
         const url = `${baseUrl}/clientes`;
 
+        // If query is numeric and has CPF/CNPJ length, try specific param, else use general 'q'
+        const isNumeric = /^\d+$/.test(query?.replace(/\D/g, ''));
+        const params = isNumeric ? { cpf_cnpj: query.replace(/\D/g, '') } : { q: query };
+
         try {
-            console.log(`🔍 Searching customers in TI: ${url} (CPF: ${cpfCnpj})`);
+            console.log(`🔍 Searching customers in TI: ${url} (Params: ${JSON.stringify(params)})`);
             const response = await axios.get(url, {
                 headers,
-                params: { cpf_cnpj: cpfCnpj }
+                params
             });
             return response.data;
         } catch (error) {
             console.error('❌ Error searching customers in TI:', {
                 url,
-                params: { cpf_cnpj: cpfCnpj },
+                params,
                 status: error.response?.status,
                 data: error.response?.data,
                 message: error.message
