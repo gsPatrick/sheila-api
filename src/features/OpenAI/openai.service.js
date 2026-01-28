@@ -65,7 +65,7 @@ class OpenaiService {
 
         const systemMessage = {
             role: 'system',
-            content: (mainPrompt || 'Você é Carol, assistente de triagem jurídica.') +
+            content: (mainPrompt || 'Você é Carol, a assistente virtual da Advocacia Andrade Nascimento. Sua missão é realizar a triagem inicial de novos clientes para as áreas de Direito Previdenciário e Trabalhista. Inicie sempre com a saudação de boas-vindas.') +
                 `
 
 ### CONTEXTO ATUAL DO CLIENTE (O QUE JÁ SABEMOS):
@@ -114,16 +114,15 @@ IMPORTANTE: Forneça sempre o bloco COMPLETO e ATUALIZADO em cada chamada. Não 
                     model: 'gpt-4o-mini', // Using gpt-4o-mini for faster/better tool handling if available, else keep gpt-4
                     messages: [systemMessage, ...history],
                     tools: tools,
-                    tool_choice: "auto"
+                    tool_choice: "auto",
                 },
                 {
-                    headers: {
-                        'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json'
-                    }
+                    headers: { 'Authorization': `Bearer ${apiKey}` }
                 }
             );
 
+            const sentSystemMsg = systemMessage.content.substring(0, 100);
+            console.log(`📡 OpenAI Request Sent. System Prompt Start: "${sentSystemMsg}..."`);
             console.log(`🤖 OpenAI Response Received. Tokens: ${response.data.usage?.total_tokens}`);
 
             let responseMessage = response.data.choices[0].message;
