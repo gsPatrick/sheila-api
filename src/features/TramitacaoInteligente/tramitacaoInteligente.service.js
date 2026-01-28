@@ -17,7 +17,7 @@ class TramitacaoInteligenteService {
     async getBaseUrl() {
         const baseUrl = await settingsService.getByKey('tramitacaoApiBaseUrl');
         // Using default if not set, but adhering to /api/v1 expectation
-        return baseUrl || 'https://api.tramitacaointeligente.com.br/api/v1';
+        return baseUrl || 'https://tramitacaointeligente.com.br/api/v1';
     }
 
     // A. Serviços de Escrita
