@@ -128,7 +128,7 @@ Você pode ir enviando os que tiver aqui mesmo, sem pressa! A equipe jurídica v
 Fique tranquilo(a), vamos cuidar do seu caso!` },
             { key: 'carol_alert_number', value: '' },
             { key: 'tramitacaoApiKey', value: '' },
-            { key: 'tramitacaoApiBaseUrl', value: 'https://api.tramitacaointeligente.com.br/api/v1' },
+            { key: 'tramitacaoApiBaseUrl', value: 'https://tramitacaointeligente.com.br/api/v1' },
             { key: 'tramitacaoWebhookUrl', value: '' }
         ];
 
