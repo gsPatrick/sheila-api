@@ -82,7 +82,14 @@ E-mail: [Melhor E-mail]
 Possui Advogado: [Sim/Não] (Resposta: [Frase do cliente])
 Resumo do Caso: [Bloco de texto único descrevendo o histórico e problema do cliente]
 
-IMPORTANTE: Forneça sempre o bloco COMPLETO e ATUALIZADO em cada chamada. Não use separadores como '---' nem repita blocos antigos.`
+IMPORTANTE: Forneça sempre o bloco COMPLETO e ATUALIZADO em cada chamada. Não use separadores como '---' nem repita blocos antigos.
+
+### PROTOCOLO DE SEGURANÇA (ANTI-GOLPE):
+Caso o cliente mencione que "alguém entrou em contato", "outro número chamou", "golpe", "fraude" ou envie um print/número suspeito se passando pela Dra. Sheila ou escritório:
+1. AJA IMEDIATAMENTE com seriedade e alerta.
+2. INFORME CLARAMENTE: "Os únicos contatos oficiais do escritório são (11) 96961-7333 e (11) 5514-0839."
+3. ORIENTE o cliente a bloquear o número suspeito e não passar informações.
+4. CONFIRME que o escritório não solicita pagamentos antecipados por PIX em contas de terceiros.`
         };
 
         try {
@@ -171,7 +178,8 @@ IMPORTANTE: Forneça sempre o bloco COMPLETO e ATUALIZADO em cada chamada. Não 
                             const hasCoreData = (data.name || chat.contactName) && (data.cpf || chat.cpf) && (data.email || chat.email);
                             if (hasCoreData && !chat.tramitacaoCustomerId) {
                                 console.log(`🚀 Core data captured for ${data.name || chat.contactName}. Triggering auto-sync to TI...`);
-                                tramitacaoService.searchCustomers(data.cpf || chat.cpf).then(async (result) => {
+                                try {
+                                    const result = await tramitacaoService.searchCustomers(data.cpf || chat.cpf);
                                     const cleanInputCpf = (data.cpf || chat.cpf).replace(/\D/g, '');
                                     const existing = result.customers?.find(c => c.cpf_cnpj?.replace(/\D/g, '') === cleanInputCpf);
 
@@ -192,22 +200,27 @@ IMPORTANTE: Forneça sempre o bloco COMPLETO e ATUALIZADO em cada chamada. Não 
                                     }
 
                                     if (finalNotes) {
-                                        tramitacaoService.upsertNote(chat.id, finalNotes).catch(e =>
+                                        await tramitacaoService.upsertNote(chat.id, finalNotes).catch(e =>
                                             console.error('❌ Failed to push initial note:', e.message)
                                         );
                                     }
-                                }).catch(e => console.error('❌ TI Auto-sync error:', e.message));
+                                } catch (e) {
+                                    console.error('❌ TI Auto-sync error:', e.message);
+                                }
                             } else if (finalNotes && chat.tramitacaoCustomerId) {
                                 // Regular note update if already synced
-                                tramitacaoService.upsertNote(chat.id, finalNotes).catch(e =>
+                                await tramitacaoService.upsertNote(chat.id, finalNotes).catch(e =>
                                     console.error('❌ Failed to auto-sync note to TI:', e.message)
                                 );
                             }
 
                             // 📋 Trello Integration: Create card on finalization
                             if (data.triageStatus === 'finalizada' || data.triageStatus === 'encerrada_etica') {
+                                console.log('📋 Turn is final. Triggering Trello card creation...');
                                 const trelloService = require('../Trello/trello.service');
-                                trelloService.createTrelloCard(chat.id).catch(e =>
+                                // Refetch chat to ensure we have the latest IDs and fields
+                                await chat.reload();
+                                await trelloService.createTrelloCard(chat.id).catch(e =>
                                     console.error('❌ Failed to create Trello card:', e.message)
                                 );
                             }

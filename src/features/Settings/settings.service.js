@@ -15,7 +15,8 @@ class SettingsService {
         'trelloKey': 'TRELLO_KEY',
         'trelloToken': 'TRELLO_TOKEN',
         'trelloBoardId': 'TRELLO_BOARD_ID',
-        'trelloListId': 'TRELLO_LIST_ID'
+        'trelloListId': 'TRELLO_LIST_ID',
+        'aiReactivationChar': 'AI_REACTIVATION_CHAR'
     };
 
     async getAll() {

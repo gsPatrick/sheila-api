@@ -6,6 +6,7 @@ const { Message } = require('../../models');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const settingsService = require('../Settings/settings.service');
 
 class ZapiWebhookService {
     async process(payload, io) {
@@ -62,6 +63,22 @@ class ZapiWebhookService {
         // Se não for White-list, cria com IA desativada para não confundir no painel
         const chat = await chatService.findOrCreateChat(contactNumber, senderName, isWhitelisted);
         console.log(`📂 Chat found/created. ID: ${chat.id} | AI Active: ${chat.isAiActive}`);
+
+        // --- 4b. AI Reactivation via Character ---
+        const reactivationChar = await settingsService.getByKey('aiReactivationChar');
+        if (!isMsgFromMe && body.trim() === reactivationChar && reactivationChar) {
+            console.log(`🟢 Reactivating AI for Chat ${chat.id} via character: ${reactivationChar}`);
+            chat.isAiActive = true;
+            await chat.save();
+
+            if (io) {
+                io.emit('chat_updated', chat.get({ plain: true }));
+            }
+
+            // Send a subtle confirmation to the user
+            await zapiService.sendMessage(contactNumber, "✨ *Assistente Carol reativada!* Como posso ajudar você agora?");
+            return;
+        }
 
         // 5. Processamento de Mensagem
         let newMessage;

@@ -1,5 +1,6 @@
 const { Chat } = require('../../models');
 const { Op } = require('sequelize');
+const axios = require('axios');
 const settingsService = require('../Settings/settings.service');
 
 class TramitacaoInteligenteService {

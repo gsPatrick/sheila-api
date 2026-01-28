@@ -73,6 +73,20 @@ class TrelloService {
         const { key, token, boardId } = creds;
         const title = `${chat.contactName?.toUpperCase() || 'CLIENTE NOVO'} - ${chat.contactNumber}`;
 
+        // Helper to slugify name for the URL
+        const slugify = (text) => {
+            return text
+                .toString()
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^\w\s-]/g, '')
+                .replace(/[\s_-]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+        };
+
+        const tiSlug = chat.contactName ? `${chat.tramitacaoCustomerId}-${slugify(chat.contactName)}` : chat.tramitacaoCustomerId;
+
         const description = `
 ### DADOS DA TRIAGEM
 - **Nome:** ${chat.contactName || 'Não Informado'}
@@ -80,7 +94,20 @@ class TrelloService {
 - **CPF:** ${chat.cpf || 'Não Informado'}
 - **E-mail:** ${chat.email || 'Não Informado'}
 - **Área:** ${chat.area || 'Não Definida'}
-- **Link TI:** https://tramitacaointeligente.com.br/clientes/${chat.tramitacaoCustomerId || ''}
+- **Possui Advogado?** ${chat.hasLawyer ? 'Sim' : 'Não'}
+- **Resposta sobre Advogado:** ${chat.lawyerResponse || 'N/A'}
+- **Link TI:** https://planilha.tramitacaointeligente.com.br/clientes/${tiSlug || ''}
+
+### INFORMAÇÕES DO USUÁRIO (Sincronizado TI)
+- **Data de Nascimento:** ${chat.birthdate || 'Não Informado'}
+- **Sexo:** ${chat.sexo || 'Não Informado'}
+- **Estado Civil:** ${chat.marital_status || 'Não Informado'}
+- **Profissão:** ${chat.profession || 'Não Informado'}
+- **RG:** ${chat.rg_numero || 'Não Informado'}
+- **Senha Meu INSS:** ${chat.meu_inss_pass || 'Não Informado'}
+- **Mãe:** ${chat.mother_name || 'Não Informado'}
+- **Pai:** ${chat.father_name || 'Não Informado'}
+- **Endereço:** ${chat.street || ''}, ${chat.street_number || ''} - ${chat.neighborhood || ''}, ${chat.city || ''}/${chat.state || ''} (CEP: ${chat.zipcode || ''})
 
 ### RESUMO DO CASO
 ${chat.notes || 'Nenhuma nota disponível.'}
