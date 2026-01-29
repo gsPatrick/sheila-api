@@ -1,12 +1,51 @@
 require('dotenv').config({ path: '../../.env' });
 const bcrypt = require('bcryptjs');
-const { User, Setting, Chat, Message } = require('../models');
+const { User, Setting, Chat, Message, Blacklist } = require('../models');
 const sequelize = require('./database');
+const blacklistNumbers = require('./blacklist_data');
 
 async function seed() {
     try {
         // WARNING: force: true DROPS ALL TABLES. Use only for full reset.
         await sequelize.sync({ force: true });
+
+        // Create Admin User
+        const adminEmail = 'admin@admin.com';
+        const adminPassword = 'admin';
+        const hashedPassword = await bcrypt.hash(adminPassword, 10);
+
+        const [user, created] = await User.findOrCreate({
+            where: { email: adminEmail },
+            defaults: {
+                password: hashedPassword
+            }
+        });
+
+        if (created) {
+            console.log('Admin user created:', adminEmail);
+        } else {
+            console.log('Admin user already exists');
+        }
+
+        console.log('Default settings initialized');
+
+        // Blacklist Seeding
+        if (blacklistNumbers && blacklistNumbers.length > 0) {
+            console.log(`Seeding ${blacklistNumbers.length} blacklist numbers...`);
+            const blacklistEntries = blacklistNumbers.map(phone => ({
+                phone,
+                reason: 'Importado da lista inicial'
+            }));
+
+            // Bulk create for performance
+            await Blacklist.bulkCreate(blacklistEntries, { ignoreDuplicates: true });
+            console.log('Blacklist populated successfully.');
+        }
+
+        // Mock Chats removed
+        console.log('Mock chats skipped for clean reset.');
+
+        process.exit(0);
 
         // Create Admin User
         const adminEmail = 'admin@admin.com';
