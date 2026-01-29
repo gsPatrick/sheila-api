@@ -2,6 +2,7 @@ const chatService = require('./chat.service');
 const zapiService = require('../ZapiWebhook/zapi.service');
 const { Message, Chat } = require('../../models');
 const tramitacaoService = require('../TramitacaoInteligente/tramitacaoInteligente.service');
+const tiAutomationService = require('../TramitacaoInteligente/tiAutomation.service');
 const trelloService = require('../Trello/trello.service');
 
 class ChatController {
@@ -107,20 +108,22 @@ class ChatController {
             }
 
             await zapiService.sendMessage(targetChat.contactNumber, finalBody);
-
-            const message = await Message.create({
-                ChatId: finalChatId,
-                body: finalBody,
-                isFromMe: true,
-                timestamp: new Date()
-            });
-
-            if (req.app.get('io')) {
-                req.app.get('io').emit('new_message', message);
-            }
-
-            return res.json(message);
+            return res.json({ success: true });
         } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+
+    async generateDocs(req, res) {
+        const { id } = req.params;
+        try {
+            const chat = await Chat.findByPk(id);
+            if (!chat) return res.status(404).json({ error: 'Chat não encontrado' });
+
+            const result = await tiAutomationService.generateFullPackage(chat);
+            return res.json(result);
+        } catch (error) {
+            console.error('❌ Error in generateDocs controller:', error.message);
             return res.status(500).json({ error: error.message });
         }
     }

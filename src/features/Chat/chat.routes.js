@@ -14,6 +14,7 @@ module.exports = (io) => {
     router.put('/:id', chatController.update.bind(chatController));
     router.get('/:id/messages', chatController.messages.bind(chatController));
     router.post('/send-message', chatController.sendManualMessage.bind(chatController));
+    router.post('/:id/generate-docs', chatController.generateDocs.bind(chatController));
     router.put('/:id/toggle-ai', chatController.toggleAi.bind(chatController));
 
     return router;
