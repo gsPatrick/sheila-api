@@ -59,7 +59,7 @@ class OpenaiService {
 
         const history = messages.reverse().map(msg => ({
             role: msg.isFromMe ? 'assistant' : 'user',
-            content: msg.body
+            content: msg.transcription || msg.body // Use transcription if available
         }));
 
         console.log(`🧠 Generating Response for Chat ${chatId}. History Length: ${history.length}`);
@@ -68,7 +68,7 @@ class OpenaiService {
             role: 'system',
             content: (mainPrompt || 'Você é Carol, a assistente virtual da Advocacia Andrade Nascimento. Sua missão é realizar a triagem inicial de novos clientes para as áreas de Direito Previdenciário e Trabalhista. Inicie sempre com a saudação de boas-vindas.') +
                 `
-
+    
 ### CONTEXTO ATUAL DO CLIENTE (O QUE JÁ SABEMOS):
 - Nome: ${chat.contactName || 'Não informado'}
 - CPF/CNPJ: ${chat.cpf || 'Não informado'}
@@ -84,12 +84,30 @@ Resumo do Caso: [Bloco de texto único descrevendo o histórico e problema do cl
 
 IMPORTANTE: Forneça sempre o bloco COMPLETO e ATUALIZADO em cada chamada. Não use separadores como '---' nem repita blocos antigos.
 
+### ROTEIRO DE TRIAGEM (SIGA ESTA ORDEM):
+1. **Entender o Caso**: Descubra o problema principal e defina a Área Jurídica.
+2. **Verificar Advogado**: Pergunte se já tem advogado. Se SIM, encerre (status: encerrada_etica).
+3. **Coletar Dados**: Peça Nome Completo, CPF e E-mail (um por vez para não assustar).
+4. **Solicitar Documentos**: Peça para o cliente enviar uma FOTO do RG/CNH e Comprovante de Residência.
+5. **FINALIZAR**: Assim que pedir os documentos e tiver os dados básicos, mude o status para 'finalizada'. Não precisa esperar a pessoa mandar a foto para finalizar.
+
+### REGRAS JURÍDICAS BÁSICAS (LEMBRE-SE):
+- **Pensão por Morte**: O que importa é a qualidade de segurado do **FALECIDO**, não de quem pede. Não pergunte se a viúva contribuiu, pergunte sobre o marido falecido.
+- **Áudios**: Você RECEBE a transcrição dos áudios que o cliente envia. Trate como texto normal. NÃO diga que não pode ouvir.
+
 ### PROTOCOLO DE SEGURANÇA (ANTI-GOLPE):
 Caso o cliente mencione que "alguém entrou em contato", "outro número chamou", "golpe", "fraude" ou envie um print/número suspeito se passando pela Dra. Sheila ou escritório:
 1. AJA IMEDIATAMENTE com seriedade e alerta.
 2. INFORME CLARAMENTE: "Os únicos contatos oficiais do escritório são (11) 96961-7333 e (11) 5514-0839."
 3. ORIENTE o cliente a bloquear o número suspeito e não passar informações.
-4. CONFIRME que o escritório não solicita pagamentos antecipados por PIX em contas de terceiros.`
+4. CONFIRME que o escritório não solicita pagamentos antecipados por PIX em contas de terceiros.
+    
+### FASE PÓS-TRIAGEM (AGUARDANDO ATENDIMENTO):
+Se o status da triagem for 'finalizada' ou 'encerrada_etica', mas o cliente continuar perguntando:
+1. NÃO DESLIGUE NEM ENCERRE A CONVERSA.
+2. Continue tirando dúvidas sobre o andamento, prazos ou perguntas gerais.
+3. Se perguntarem sobre o processo, USE A FERRAMENTA 'get_process_status' para buscar no TI.
+4. Explique que um atendente humano logo entrará em contato para os próximos passos formais.`
         };
 
         try {
@@ -98,7 +116,7 @@ Caso o cliente mencione que "alguém entrou em contato", "outro número chamou",
                     type: "function",
                     function: {
                         name: "update_customer_data",
-                        description: "CRITICAL: You MUST call this function every single time the user provides ANY new information during the conversation. This includes: name, CPF, CNPJ, email, whether they have a lawyer, which legal area they need help with, or any details about their case. Always include ALL previously known fields plus the new information. Never skip calling this function when the user answers a question.",
+                        description: "CRITICAL: You MUST call this function whenever you gather new information. Update the 'notes' with a comprehensive summary.",
                         parameters: {
                             type: "object",
                             properties: {
@@ -109,7 +127,7 @@ Caso o cliente mencione que "alguém entrou em contato", "outro número chamou",
                                 lawyerResponse: { type: "string", description: "The exact phrase the user said about having or not having a lawyer" },
                                 area: { type: "string", enum: ["previdenciario", "trabalhista", "outro"], description: "The area of law the customer needs help with" },
                                 notes: { type: "string", description: "Comprehensive summary of everything learned about the customer so far. Include: employment history, health issues, benefits status, case details, and all relevant context from the conversation." },
-                                triageStatus: { type: "string", enum: ["em_andamento", "finalizada", "encerrada_etica"], description: "Current triage status. Set to 'encerrada_etica' if customer has a lawyer, 'finalizada' when triage is complete and documents were requested." }
+                                triageStatus: { type: "string", enum: ["em_andamento", "finalizada", "encerrada_etica"], description: "Set to 'finalizada' AFTER collecting Name, CPF, Email AND asking for documents. Set to 'encerrada_etica' if already has lawyer." }
                             },
                             required: ["notes"]
                         }
@@ -159,9 +177,8 @@ Caso o cliente mencione que "alguém entrou em contato", "outro número chamou",
                             const data = JSON.parse(toolCall.function.arguments);
                             console.log(`💾 AI extracted data:`, data);
 
-                            // Voltamos para notas consolidadas conforme pedido do usuário
-                            // A IA agora é responsável por manter um bloco único e organizado.
                             const finalNotes = data.notes || chat.notes;
+                            const oldStatus = chat.triageStatus; // Capture old status to detect change
 
                             await chat.update({
                                 contactName: data.name || chat.contactName,
@@ -234,6 +251,20 @@ Caso o cliente mencione que "alguém entrou em contato", "outro número chamou",
                                 name: 'update_customer_data',
                                 content: `Updated fields: ${Object.keys(data).join(', ')}. Data saved successfully.`
                             });
+
+                            // Inject SYSTEM instruction if status just changed to FINALIZED
+                            if (oldStatus !== 'finalizada' && data.triageStatus === 'finalizada') {
+                                console.log('🎯 Status changed to FINALIZED. Injecting specific response instruction.');
+                                currentMessages.push({
+                                    role: 'system',
+                                    content: `STATUS CHANGED TO FINALIZED. 
+                                    Send IMMEDIATE EXACT message to user:
+                                    "Prontinho! Seu cadastro inicial foi finalizado com sucesso e já encaminhei tudo para a Drª Sheila.
+                                    
+                                    A partir de agora, continuo por aqui para tirar suas dúvidas enquanto você aguarda o atendimento humano. Se quiser saber sobre algum processo, basta perguntar 'consultar processo' que eu verifico para você!"`
+                                });
+                            }
+
                         } catch (e) {
                             console.error('Error in tool execution (update_customer_data):', e);
                         }
