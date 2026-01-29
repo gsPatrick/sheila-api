@@ -107,12 +107,15 @@ class ZapiWebhookService {
                 timestamp: new Date()
             });
 
-            // Trigger Whisper transcription in background
-            openaiService.transcribeAudio(newMessage.id, filePath).then(updatedMsg => {
+            // Await transcription so AI context is ready
+            try {
+                const updatedMsg = await openaiService.transcribeAudio(newMessage.id, filePath);
                 if (io) {
                     io.emit('message_updated', updatedMsg);
                 }
-            }).catch(err => console.error('Whisper error:', err));
+            } catch (err) {
+                console.error('Whisper error:', err);
+            }
 
         } else {
             newMessage = await Message.create({
