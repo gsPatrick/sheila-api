@@ -9,7 +9,7 @@ async function seed() {
         // WARNING: force: true DROPS ALL TABLES. Use only for full reset.
         await sequelize.sync({ force: true });
 
-        // Create Admin User
+        // 1. Create Admin User
         const adminEmail = 'admin@admin.com';
         const adminPassword = 'admin';
         const hashedPassword = await bcrypt.hash(adminPassword, 10);
@@ -27,45 +27,7 @@ async function seed() {
             console.log('Admin user already exists');
         }
 
-        console.log('Default settings initialized');
-
-        // Blacklist Seeding
-        if (blacklistNumbers && blacklistNumbers.length > 0) {
-            console.log(`Seeding ${blacklistNumbers.length} blacklist numbers...`);
-            const blacklistEntries = blacklistNumbers.map(phone => ({
-                phone,
-                reason: 'Importado da lista inicial'
-            }));
-
-            // Bulk create for performance
-            await Blacklist.bulkCreate(blacklistEntries, { ignoreDuplicates: true });
-            console.log('Blacklist populated successfully.');
-        }
-
-        // Mock Chats removed
-        console.log('Mock chats skipped for clean reset.');
-
-        process.exit(0);
-
-        // Create Admin User
-        const adminEmail = 'admin@admin.com';
-        const adminPassword = 'admin';
-        const hashedPassword = await bcrypt.hash(adminPassword, 10);
-
-        const [user, created] = await User.findOrCreate({
-            where: { email: adminEmail },
-            defaults: {
-                password: hashedPassword
-            }
-        });
-
-        if (created) {
-            console.log('Admin user created:', adminEmail);
-        } else {
-            console.log('Admin user already exists');
-        }
-
-        // Default Settings
+        // 2. Default Settings
         const defaultSettings = [
             { key: 'zApiInstance', value: process.env.ZAPI_INSTANCE_ID || '' },
             { key: 'zApiToken', value: process.env.ZAPI_TOKEN || '' },
@@ -87,8 +49,23 @@ async function seed() {
 
         console.log('Default settings initialized');
 
-        // Mock Chats and Messages
-        // REMOVED to ensure clean state for testing
+        // 3. Blacklist Seeding
+        if (blacklistNumbers && blacklistNumbers.length > 0) {
+            console.log(`Seeding ${blacklistNumbers.length} blacklist numbers...`);
+            // Deduplicate just in case
+            const uniqueNumbers = [...new Set(blacklistNumbers)];
+            const blacklistEntries = uniqueNumbers.map(phone => ({
+                phoneNumber: phone,
+                reason: 'Importado da lista inicial'
+            }));
+
+            // Bulk create for performance
+            await Blacklist.bulkCreate(blacklistEntries, { ignoreDuplicates: true });
+            console.log('Blacklist populated successfully.');
+        } else {
+            console.log('No blacklist numbers found to seed.');
+        }
+
         console.log('Mock chats skipped for clean reset.');
 
         process.exit(0);
