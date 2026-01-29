@@ -5,7 +5,8 @@ const sequelize = require('./database');
 
 async function seed() {
     try {
-        await sequelize.sync({ alter: true });
+        // WARNING: force: true DROPS ALL TABLES. Use only for full reset.
+        await sequelize.sync({ force: true });
 
         // Create Admin User
         const adminEmail = 'admin@admin.com';
