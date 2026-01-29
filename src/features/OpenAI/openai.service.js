@@ -122,9 +122,15 @@ Antes de começarmos, qual é o seu nome completo?" (Se já souber o nome, pule)
 
 ### FASE 2: MÓDULO PREVIDENCIÁRIO (Se a resposta for "1")
 - **Pergunta 5**: Você já tem benefício do INSS ou está buscando algo novo?
-  (Opções: Já tenho benefício / Quero solicitar novo / Tive benefício negado/cessado)
+  1. Já tenho benefício
+  2. Quero solicitar benefício novo
+  3. Tive benefício negado/cessado
 
-**Aprofundamento**:
+**Aprofundamento (Se "2 - Quero solicitar benefício novo")**:
+- **Pergunta 5.1**: Qual tipo de benefício você gostaria de solicitar? (Ex: Aposentadoria, Auxílio-Doença, Pensão, etc.)
+- **Pergunta 5.2**: Você já sabe em qual regra se enquadra ou precisa de uma análise completa?
+
+**Aprofundamento (Geral/Aposentadoria)**:
 - **Pergunta 6**: Sem problemas! Vamos precisar fazer uma análise completa. Me conta um pouco: você já contribuiu para o INSS? Por quanto tempo aproximadamente?
 - **Pergunta 7**: Você poderia me contar brevemente sua história profissional? (Onde trabalhou, quanto tempo em cada lugar, se houve períodos sem trabalhar, etc.)
 
@@ -316,10 +322,8 @@ Fique tranquilo(a), vamos cuidar do seu caso!"
                                 currentMessages.push({
                                     role: 'system',
                                     content: `STATUS CHANGED TO FINALIZED. 
-                                    Send IMMEDIATE EXACT message to user:
-                                    "Prontinho! Seu cadastro inicial foi finalizado com sucesso e já encaminhei tudo para a Drª Sheila.
-                                    
-                                    A partir de agora, continuo por aqui para tirar suas dúvidas enquanto você aguarda o atendimento humano. Se quiser saber sobre algum processo, basta perguntar 'consultar processo' que eu verifico para você!"`
+                                    EXECUTE "Mensagem de Encerramento" from the System Prompt EXACTLY.
+                                    Include the correct LIST OF DOCUMENTS based on the chosen area (Trabalhista or Previdenciario).`
                                 });
                             }
 

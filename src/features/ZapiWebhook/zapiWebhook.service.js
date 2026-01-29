@@ -160,7 +160,43 @@ class ZapiWebhookService {
                 return;
             }
 
-            console.log('🤖 AI Active and Whitelisted. Triggering Response Generation...');
+            // --- HARDCODED FIRST INTERACTION CHECK ---
+            const botMsgCount = await Message.count({
+                where: {
+                    ChatId: chat.id,
+                    isFromMe: true
+                }
+            });
+
+            if (botMsgCount === 0) {
+                console.log(`🆕 New chat detected. Sending Hardcoded Phase 0 Script directly.`);
+
+                const welcomeScript = `Olá! Você entrou em contato com a Advocacia Andrade Nascimento.
+Somos especialistas em Direito Previdenciário e Trabalhista.
+Meu nome é Carol e estou aqui para direcionar seu atendimento da melhor forma!
+Antes de começarmos, qual é o seu nome completo?`;
+
+                // 1. Send via Z-API
+                await zapiService.sendMessage(contactNumber, welcomeScript);
+
+                // 2. Save to DB so AI sees it later
+                const welcomeMsg = await Message.create({
+                    ChatId: chat.id,
+                    body: welcomeScript,
+                    isFromMe: true,
+                    timestamp: new Date()
+                });
+
+                // 3. Emit to Frontend
+                if (io) {
+                    io.emit('new_message', { message: welcomeMsg, chat });
+                }
+
+                console.log(`✅ Hardcoded Welcome Message sent.`);
+                return; // STOP here. Don't call OpenAI.
+            }
+
+            console.log('🤖 AI Active. Generating Response for ongoing conversation...');
             // Generate AI response
             openaiService.generateResponse(chat.id, io).catch(err => console.error('❌ GPT error:', err));
         } else {
