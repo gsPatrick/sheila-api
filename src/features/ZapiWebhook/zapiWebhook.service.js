@@ -10,7 +10,7 @@ const settingsService = require('../Settings/settings.service');
 
 class ZapiWebhookService {
     async process(payload, io) {
-        const { phone, fromMe, text, audio, type, senderName, instanceId, messageId } = payload;
+        const { phone, fromMe, text, audio, type, senderName, instanceId, messageId, isGroup, participant } = payload;
         const msgId = messageId || payload.id; // Z-API variation
 
         // Ignore status updates
@@ -19,7 +19,7 @@ class ZapiWebhookService {
         }
 
         // 1b. Ignore GROUPS and Broadcast lists
-        if (phone && (phone.includes('-') || phone.includes('@g.us'))) {
+        if (isGroup === true || (phone && (phone.endsWith('@g.us') || phone.includes('-'))) || participant) {
             console.log(`👥 Group/Broadcast message ignored from ${phone}`);
             return;
         }
@@ -195,7 +195,14 @@ Meu nome é Carol e estou aqui para direcionar seu atendimento da melhor forma!
 Antes de começarmos, qual é o seu nome completo?`;
 
                 // 1. Send via Z-API
-                await zapiService.sendMessage(contactNumber, welcomeScript);
+                try {
+                    await zapiService.sendMessage(contactNumber, welcomeScript);
+                } catch (error) {
+                    console.error('❌ Failed to send initial welcome message:', error.message);
+                    // We might want to stop here or continue. 
+                    // If we can't send the message, saving it to DB implies we sent it, which might confuse the AI later.
+                    // But blocking the crash is the priority.
+                }
 
                 // 2. Save to DB so AI sees it later
                 const welcomeMsg = await Message.create({
