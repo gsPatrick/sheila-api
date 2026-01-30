@@ -46,6 +46,24 @@ class ZapiWebhookService {
             return;
         }
 
+        // --- MANUEL AI TOGGLE COMMANDS ---
+        if (isMsgFromMe) {
+            const cleanBody = body.trim();
+            if (cleanBody === '#') {
+                console.log(`🔴 Manual Command: Deactivating AI for ${contactNumber}`);
+                const chat = await chatService.findOrCreateChat(contactNumber, senderName, false);
+                await chatService.updateAiStatus(chat.id, false);
+                if (io) io.emit('chat_updated', { ...chat.get(), isAiActive: false });
+                return; // Stop processing
+            } if (cleanBody === '.') {
+                console.log(`🟢 Manual Command: Activating AI for ${contactNumber}`);
+                const chat = await chatService.findOrCreateChat(contactNumber, senderName, false);
+                await chatService.updateAiStatus(chat.id, true);
+                if (io) io.emit('chat_updated', { ...chat.get(), isAiActive: true });
+                return; // Stop processing
+            }
+        }
+
 
 
         // 3. Verificação da Blacklist
