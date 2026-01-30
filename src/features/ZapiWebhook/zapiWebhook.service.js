@@ -169,14 +169,8 @@ class ZapiWebhookService {
             return;
         }
 
-        // 8. Acionamento da IA (Com White-list para testes)
+        // 8. Acionamento da IA
         if (chat.isAiActive && !isMsgFromMe) {
-            // WHITE-LIST PARA TESTES (Restrito ao número do usuário)
-            const allowedSuffixes = ['7183141335', '71983141335', '11968070834', '968070834'];
-            if (!allowedSuffixes.some(suffix => contactNumber.endsWith(suffix))) {
-                console.log(`⏭️ AI Trigger BLOCKED by Whitelist for ${contactNumber}. Persistence OK.`);
-                return;
-            }
 
             // --- HARDCODED FIRST INTERACTION CHECK ---
             const botMsgCount = await Message.count({
@@ -187,61 +181,65 @@ class ZapiWebhookService {
             });
 
             if (botMsgCount === 0) {
-                console.log(`🆕 New chat detected. Sending Hardcoded Phase 0 Script directly.`);
+                console.log(`🆕 New chat detected. Preparing Hardcoded Phase 0 Script...`);
 
-                const welcomeScript = `Olá! Você entrou em contato com a Advocacia Andrade Nascimento.
-Somos especialistas em Direito Previdenciário e Trabalhista.
-Meu nome é Carol e estou aqui para direcionar seu atendimento da melhor forma!
+                const welcomeScript = `Olá! Você entrou em contato com o escritório da Dra Sheila Araújo.
+Somos especialistas em Direito Previdenciário e Trabalhista - especialista em acidente de trabalho.
 Antes de começarmos, qual é o seu nome completo?`;
+
+                // DELAY ANTI-SPAM (3s - 6s)
+                const delay = Math.floor(Math.random() * 3000) + 3000;
+                console.log(`⏳ Waiting ${delay}ms before sending welcome message...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
 
                 // 1. Send via Z-API
                 try {
                     await zapiService.sendMessage(contactNumber, welcomeScript);
                 } catch (error) {
                     console.error('❌ Failed to send initial welcome message:', error.message);
-                    // We might want to stop here or continue. 
-                    // If we can't send the message, saving it to DB implies we sent it, which might confuse the AI later.
-                    // But blocking the crash is the priority.
-                }
-
-                // 2. Save to DB so AI sees it later
-                const welcomeMsg = await Message.create({
-                    ChatId: chat.id,
-                    body: welcomeScript,
-                    isFromMe: true,
-                    timestamp: new Date()
-                });
-
-                // 3. Emit to Frontend
-                if (io) {
-                    io.emit('new_message', { message: welcomeMsg, chat });
-                }
-
-                console.log(`✅ Hardcoded Welcome Message sent.`);
-                return; // STOP here. Don't call OpenAI.
+                }    // We might want to stop here or continue. 
+                // If we can't send the message, saving it to DB implies we sent it, which might confuse the AI later.
+                // But blocking the crash is the priority.
             }
 
-            console.log('🤖 AI Active. Generating Response for ongoing conversation...');
-            // Generate AI response
-            openaiService.generateResponse(chat.id, io).catch(err => console.error('❌ GPT error:', err));
-        } else {
-            console.log(`⏭️ Skipping AI. Active: ${chat.isAiActive}, FromMe: ${isMsgFromMe}`);
+            // 2. Save to DB so AI sees it later
+            const welcomeMsg = await Message.create({
+                ChatId: chat.id,
+                body: welcomeScript,
+                isFromMe: true,
+                timestamp: new Date()
+            });
+
+            // 3. Emit to Frontend
+            if (io) {
+                io.emit('new_message', { message: welcomeMsg, chat });
+            }
+
+            console.log(`✅ Hardcoded Welcome Message sent.`);
+            return; // STOP here. Don't call OpenAI.
         }
+
+        console.log('🤖 AI Active. Generating Response for ongoing conversation...');
+        // Generate AI response
+        openaiService.generateResponse(chat.id, io).catch(err => console.error('❌ GPT error:', err));
+    } else {
+    console.log(`⏭️ Skipping AI. Active: ${chat.isAiActive}, FromMe: ${isMsgFromMe}`);
+}
     }
 
     async downloadFile(url, dest) {
-        const response = await axios({
-            method: 'GET',
-            url: url,
-            responseType: 'stream'
-        });
+    const response = await axios({
+        method: 'GET',
+        url: url,
+        responseType: 'stream'
+    });
 
-        return new Promise((resolve, reject) => {
-            response.data.pipe(fs.createWriteStream(dest))
-                .on('finish', () => resolve())
-                .on('error', (e) => reject(e));
-        });
-    }
+    return new Promise((resolve, reject) => {
+        response.data.pipe(fs.createWriteStream(dest))
+            .on('finish', () => resolve())
+            .on('error', (e) => reject(e));
+    });
+}
 }
 
 module.exports = new ZapiWebhookService();
