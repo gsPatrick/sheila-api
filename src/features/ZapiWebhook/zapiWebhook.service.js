@@ -183,7 +183,11 @@ class ZapiWebhookService {
             if (botMsgCount === 0) {
                 console.log(`🆕 New chat detected. Preparing Hardcoded Phase 0 Script...`);
 
-                const welcomeScript = `Olá! Você entrou em contato com o escritório da Dra Sheila Araújo.\n\nSomos especialistas em Direito Previdenciário e Trabalhista - especialista em acidente de trabalho.\n\nAntes de começarmos, qual é o seu nome completo?`;
+                const welcomeScript = `Olá! Você entrou em contato com o escritório da Dra Sheila Araújo.
+
+Somos especialistas em Direito Previdenciário e Trabalhista e  acidente de trabalho.
+
+Antes de começarmos, qual é o seu nome completo?`;
 
                 // DELAY ANTI-SPAM (3s - 6s)
                 const delay = Math.floor(Math.random() * 3000) + 3000;
