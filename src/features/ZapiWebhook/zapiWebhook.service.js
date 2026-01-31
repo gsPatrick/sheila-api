@@ -39,7 +39,8 @@ class ZapiWebhookService {
         }
 
         // 2b. Check if this is a Bot message (just sent by us)
-        const isBot = zapiService.checkAndClearBotMessage(msgId);
+        const isBot = zapiService.checkAndClearBotMessage(msgId, body);
+        const reactivationChar = (await settingsService.getByKey('aiReactivationChar')) || '.';
 
         if (isMsgFromMe && isBot) {
             console.log(`🤖 Bot message echo detected (ID: ${msgId}). Skipping deactivation.`);
@@ -82,7 +83,7 @@ class ZapiWebhookService {
         console.log(`📂 Chat found/created. ID: ${chat.id} | AI Active: ${chat.isAiActive}`);
 
         // --- 4b. AI Reactivation via Character ---
-        const reactivationChar = await settingsService.getByKey('aiReactivationChar');
+
         if (!isMsgFromMe && body.trim() === reactivationChar && reactivationChar) {
             console.log(`🟢 Reactivating AI for Chat ${chat.id} via character: ${reactivationChar}`);
             chat.isAiActive = true;

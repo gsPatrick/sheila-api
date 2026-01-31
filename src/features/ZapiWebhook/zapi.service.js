@@ -4,6 +4,7 @@ const settingsService = require('../Settings/settings.service');
 class ZapiService {
     constructor() {
         this.sentByBot = new Set();
+        this.recentBodies = new Set();
     }
 
     async sendMessage(toNumber, messageBody) {
@@ -23,6 +24,12 @@ class ZapiService {
 
         try {
             console.log(`📤 Sending Text to ${toNumber} (Instance: ${instanceId})`);
+
+            // Track body for immediate echo detection
+            const cleanBody = messageBody.trim();
+            this.recentBodies.add(cleanBody);
+            setTimeout(() => this.recentBodies.delete(cleanBody), 30000);
+
             const response = await axios.post(
                 `${baseUrl}/send-text`,
                 { phone: toNumber, message: messageBody },
@@ -283,13 +290,22 @@ class ZapiService {
         }
     }
 
-    checkAndClearBotMessage(messageId) {
-        if (!messageId) return false;
-        if (this.sentByBot.has(messageId)) {
-            // Keep it for 5 more seconds just in case of duplicate Status webhooks, but usually Received comes first
+    checkAndClearBotMessage(messageId, body) {
+        if (messageId && this.sentByBot.has(messageId)) {
+            // Keep it for 5 more seconds just in case of duplicate Status webhooks
             setTimeout(() => this.sentByBot.delete(messageId), 5000);
             return true;
         }
+
+        if (body) {
+            const cleanBody = body.trim();
+            if (this.recentBodies.has(cleanBody)) {
+                // Keep it for 5 seconds for duplicate webhooks
+                setTimeout(() => this.recentBodies.delete(cleanBody), 5000);
+                return true;
+            }
+        }
+
         return false;
     }
 }
