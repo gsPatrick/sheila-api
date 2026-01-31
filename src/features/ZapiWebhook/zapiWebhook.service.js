@@ -200,46 +200,46 @@ Antes de começarmos, qual é o seu nome completo?`;
                 }    // We might want to stop here or continue. 
                 // If we can't send the message, saving it to DB implies we sent it, which might confuse the AI later.
                 // But blocking the crash is the priority.
+
+
+                // 2. Save to DB so AI sees it later
+                const welcomeMsg = await Message.create({
+                    ChatId: chat.id,
+                    body: welcomeScript,
+                    isFromMe: true,
+                    timestamp: new Date()
+                });
+
+                // 3. Emit to Frontend
+                if (io) {
+                    io.emit('new_message', { message: welcomeMsg, chat });
+                }
+
+                console.log(`✅ Hardcoded Welcome Message sent.`);
+                return; // STOP here. Don't call OpenAI.
             }
 
-            // 2. Save to DB so AI sees it later
-            const welcomeMsg = await Message.create({
-                ChatId: chat.id,
-                body: welcomeScript,
-                isFromMe: true,
-                timestamp: new Date()
-            });
-
-            // 3. Emit to Frontend
-            if (io) {
-                io.emit('new_message', { message: welcomeMsg, chat });
-            }
-
-            console.log(`✅ Hardcoded Welcome Message sent.`);
-            return; // STOP here. Don't call OpenAI.
+            console.log('🤖 AI Active. Generating Response for ongoing conversation...');
+            // Generate AI response
+            openaiService.generateResponse(chat.id, io).catch(err => console.error('❌ GPT error:', err));
+        } else {
+            console.log(`⏭️ Skipping AI. Active: ${chat.isAiActive}, FromMe: ${isMsgFromMe}`);
         }
-
-        console.log('🤖 AI Active. Generating Response for ongoing conversation...');
-        // Generate AI response
-        openaiService.generateResponse(chat.id, io).catch(err => console.error('❌ GPT error:', err));
-    } else {
-    console.log(`⏭️ Skipping AI. Active: ${chat.isAiActive}, FromMe: ${isMsgFromMe}`);
-}
     }
 
     async downloadFile(url, dest) {
-    const response = await axios({
-        method: 'GET',
-        url: url,
-        responseType: 'stream'
-    });
+        const response = await axios({
+            method: 'GET',
+            url: url,
+            responseType: 'stream'
+        });
 
-    return new Promise((resolve, reject) => {
-        response.data.pipe(fs.createWriteStream(dest))
-            .on('finish', () => resolve())
-            .on('error', (e) => reject(e));
-    });
-}
+        return new Promise((resolve, reject) => {
+            response.data.pipe(fs.createWriteStream(dest))
+                .on('finish', () => resolve())
+                .on('error', (e) => reject(e));
+        });
+    }
 }
 
 module.exports = new ZapiWebhookService();
