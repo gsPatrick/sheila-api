@@ -355,23 +355,44 @@ class TramitacaoInteligenteService {
         }
     }
 
-    async getDossier(chatId) {
+    async getDossier(chatId, providedCpf = null) {
         const chat = await Chat.findByPk(chatId);
-        if (!chat || !chat.tramitacaoCustomerId) {
-            throw new Error('Chat not found or not linked to TI');
+        let customerId = chat?.tramitacaoCustomerId;
+        let cpf = (providedCpf || chat?.cpf || '').replace(/\D/g, '');
+
+        if (!customerId && cpf) {
+            console.log(`🔍 Customer not linked. Searching TI by CPF: ${cpf}`);
+            try {
+                const searchResult = await this.searchCustomers(cpf);
+                const customers = searchResult.customers || (Array.isArray(searchResult) ? searchResult : []);
+                if (customers && customers.length > 0) {
+                    customerId = customers[0].id;
+                    console.log(`✅ Found customer in TI: ${customerId}. Linking now.`);
+                    if (chat) {
+                        await chat.update({
+                            tramitacaoCustomerId: customerId,
+                            tramitacaoCustomerUuid: customers[0].uuid,
+                            syncStatus: 'Sincronizado',
+                            lastSyncAt: new Date()
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error('Error searching customer during dossier fetch:', e.message);
+            }
+        }
+
+        if (!customerId) {
+            throw new Error('Cliente ainda não cadastrado ou não encontrado no portal com este CPF. Para consultar andamentos, é necessário que o cadastro esteja completo e vinculado.');
         }
 
         const headers = await this.getHeaders();
         const baseUrl = await this.getBaseUrl();
 
         try {
-            console.log(`📡 Fetching Full Dossier for TI ID: ${chat.tramitacaoCustomerId}`);
-            // The TI API usually provides basic info at /clientes/{id} 
-            // and more detailed process info might require /processos or similar depending on their API.
-            // Based on previous knowledge, /clientes/{id} returns the customer with embedded dossiers/processes.
-            const response = await axios.get(`${baseUrl}/clientes/${chat.tramitacaoCustomerId}`, { headers });
+            console.log(`📡 Fetching Full Dossier for TI ID: ${customerId}`);
+            const response = await axios.get(`${baseUrl}/clientes/${customerId}`, { headers });
 
-            // Return only what the AI needs to avoid token bloat
             const customer = response.data.customer || response.data;
             return {
                 name: customer.name,
@@ -380,6 +401,8 @@ class TramitacaoInteligenteService {
                 movements: customer.last_movements || []
             };
         } catch (error) {
+            console.error('Error fetching dossier from TI:', error.response?.data || error.message);
+            throw new Error('Falha ao buscar detalhes do processo no portal. Tente novamente em instantes.');
         }
     }
 

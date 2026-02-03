@@ -55,12 +55,14 @@ class ZapiWebhookService {
                 const chat = await chatService.findOrCreateChat(contactNumber, senderName, false);
                 await chatService.updateAiStatus(chat.id, false);
                 if (io) io.emit('chat_updated', { ...chat.get(), isAiActive: false });
+                await zapiService.sendMessage(contactNumber, "Sua mensagem foi encaminhada diretamente à Dra. Sheila Araújo. Aguarde, em breve ela entrará em contato por aqui.");
                 return; // Stop processing
-            } if (cleanBody === '.') {
+            } if (cleanBody === reactivationChar) {
                 console.log(`🟢 Manual Command: Activating AI for ${contactNumber}`);
                 const chat = await chatService.findOrCreateChat(contactNumber, senderName, false);
                 await chatService.updateAiStatus(chat.id, true);
                 if (io) io.emit('chat_updated', { ...chat.get(), isAiActive: true });
+                await zapiService.sendMessage(contactNumber, "Assistente Carol ativada para auxiliar no seu atendimento.");
                 return; // Stop processing
             }
         }
@@ -93,8 +95,8 @@ class ZapiWebhookService {
                 io.emit('chat_updated', chat.get({ plain: true }));
             }
 
-            // Send a subtle confirmation to the user
-            await zapiService.sendMessage(contactNumber, "✨ *Assistente Carol reativada!* Como posso ajudar você agora?");
+            // Send a professional confirmation
+            await zapiService.sendMessage(contactNumber, "Assistente Carol ativada para auxiliar no seu atendimento.");
             return;
         }
 
