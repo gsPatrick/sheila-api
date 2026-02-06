@@ -396,19 +396,40 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
                             console.log(`🔍 AI requested process status for Chat ${chatId}. Args:`, args);
                             const dossier = await tramitacaoService.getDossier(chatId, args.cpf);
 
-                            currentMessages.push({
-                                role: 'tool',
-                                tool_call_id: toolCall.id,
-                                name: 'get_process_status',
-                                content: JSON.stringify(dossier)
-                            });
+                            // Check if processes exist
+                            if (!dossier.processes || dossier.processes.length === 0) {
+                                console.log('⚠️ No processes found in dossier.');
+                                currentMessages.push({
+                                    role: 'system',
+                                    content: `TOOL RESULT: No processes found.
+                                    CRITICAL INSTRUCTION: You MUST reply with EXACTLY this message (do not change a word):
+                                    
+                                    "Não estamos conseguindo acessar ao sistema neste momento ou não há processos associados ao CPF/CNPF informado
+                                    
+                                    Logo a Dra Sheila Araújo irá te atualizar quanto à questão
+                                    
+                                    Enquanto isso, posso lhe auxiliar em algo mais?"`
+                                });
+                            } else {
+                                currentMessages.push({
+                                    role: 'tool',
+                                    tool_call_id: toolCall.id,
+                                    name: 'get_process_status',
+                                    content: JSON.stringify(dossier)
+                                });
+                            }
                         } catch (e) {
                             console.error('Error in tool execution (get_process_status):', e.message);
                             currentMessages.push({
-                                role: 'tool',
-                                tool_call_id: toolCall.id,
-                                name: 'get_process_status',
-                                content: `Error: ${e.message}. Inform the customer that their case is not yet linked or there was a connection issue with the portal.`
+                                role: 'system',
+                                content: `TOOL ERROR: ${e.message}
+                                CRITICAL INSTRUCTION: You MUST reply with EXACTLY this message (do not change a word):
+                                
+                                "Não estamos conseguindo acessar ao sistema neste momento ou não há processos associados ao CPF/CNPF informado
+                                
+                                Logo a Dra Sheila Araújo irá te atualizar quanto à questão
+                                
+                                Enquanto isso, posso lhe auxiliar em algo mais?"`
                             });
                         }
                     }
