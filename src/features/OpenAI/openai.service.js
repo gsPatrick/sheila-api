@@ -432,6 +432,13 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
                 return null;
             }
 
+            // Re-fetch chat state to check for manual intervention during generation
+            const freshChat = await Chat.findByPk(chatId);
+            if (!freshChat || !freshChat.isAiActive) {
+                console.log(`⏹️ AI Generation aborted for Chat ${chatId} due to manual intervention or deactivation.`);
+                return null;
+            }
+
             // Send via Z-API
             console.log(`📤 Sending to Z-API (${chat.contactNumber}): ${aiText.substring(0, 30)}...`);
             await zapiService.sendMessage(chat.contactNumber, aiText);

@@ -10,8 +10,8 @@ const settingsService = require('../Settings/settings.service');
 
 class ZapiWebhookService {
     async process(payload, io) {
-        const { phone, fromMe, text, audio, type, senderName, instanceId, messageId, isGroup, participant } = payload;
-        const msgId = messageId || payload.id; // Z-API variation
+        const { phone, fromMe, text, audio, type, senderName, instanceId, messageId, isGroup, participant, ids } = payload;
+        const msgId = messageId || payload.id || (ids && ids[0]); // Z-API variation
 
         // Ignore status updates
         if (type === 'MessageStatusCallback' || (type && type !== 'ReceivedCallback')) {
