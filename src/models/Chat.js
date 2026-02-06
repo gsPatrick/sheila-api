@@ -12,6 +12,11 @@ const Chat = sequelize.define('Chat', {
         unique: true,
         allowNull: false
     },
+    chatLid: {
+        type: DataTypes.STRING,
+        unique: true,
+        allowNull: true
+    },
     contactName: {
         type: DataTypes.STRING,
         allowNull: true

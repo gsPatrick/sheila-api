@@ -111,11 +111,37 @@ class ChatService {
         });
     }
 
-    async findOrCreateChat(contactNumber, contactName = null, defaultAiStatus = true) {
-        const [chat, created] = await Chat.findOrCreate({
-            where: { contactNumber },
-            defaults: { contactName, isAiActive: defaultAiStatus }
+    async findOrCreateChat(contactNumber, contactName = null, defaultAiStatus = true, chatLid = null) {
+        let chat;
+
+        // Try searching by LID first (most reliable for Z-API split identities)
+        if (chatLid) {
+            chat = await Chat.findOne({ where: { chatLid } });
+        }
+
+        // If not found by LID, try searching by Phone Number
+        if (!chat && contactNumber) {
+            chat = await Chat.findOne({ where: { contactNumber } });
+        }
+
+        if (chat) {
+            // If found but LID is missing and we have one, update it
+            if (!chat.chatLid && chatLid) {
+                console.log(`🔗 Linking chat ${chat.id} to LID: ${chatLid}`);
+                await chat.update({ chatLid });
+            }
+            return chat;
+        }
+
+        // Create new chat
+        console.log(`🆕 Creating new chat for ${contactNumber || chatLid}`);
+        chat = await Chat.create({
+            contactNumber: contactNumber || chatLid, // Fallback if no phone
+            chatLid,
+            contactName,
+            isAiActive: defaultAiStatus
         });
+
         return chat;
     }
 

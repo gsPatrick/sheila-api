@@ -10,7 +10,7 @@ const settingsService = require('../Settings/settings.service');
 
 class ZapiWebhookService {
     async process(payload, io) {
-        const { phone, fromMe, text, audio, type, senderName, instanceId, messageId, isGroup, participant, ids } = payload;
+        const { phone, fromMe, text, audio, type, senderName, instanceId, messageId, isGroup, participant, ids, chatLid } = payload;
         const msgId = messageId || payload.id || (ids && ids[0]); // Z-API variation
 
         // Ignore status updates
@@ -51,15 +51,15 @@ class ZapiWebhookService {
         if (isMsgFromMe) {
             const cleanBody = body.trim();
             if (cleanBody === '.') {
-                console.log(`🔴 Manual Command: Deactivating AI for ${contactNumber}`);
-                const chat = await chatService.findOrCreateChat(contactNumber, senderName, false);
+                console.log(`🔴 Manual Command: Deactivating AI for ${contactNumber} (LID: ${chatLid})`);
+                const chat = await chatService.findOrCreateChat(contactNumber, senderName, false, chatLid);
                 await chatService.updateAiStatus(chat.id, false);
                 if (io) io.emit('chat_updated', { ...chat.get(), isAiActive: false });
                 await zapiService.sendMessage(contactNumber, "Carol desativada. Caso queira reativá-la, envie #");
                 return; // Stop processing
             } if (cleanBody === '#') {
-                console.log(`🟢 Manual Command: Activating AI for ${contactNumber}`);
-                const chat = await chatService.findOrCreateChat(contactNumber, senderName, false);
+                console.log(`🟢 Manual Command: Activating AI for ${contactNumber} (LID: ${chatLid})`);
+                const chat = await chatService.findOrCreateChat(contactNumber, senderName, false, chatLid);
                 await chatService.updateAiStatus(chat.id, true);
                 if (io) io.emit('chat_updated', { ...chat.get(), isAiActive: true });
                 await zapiService.sendMessage(contactNumber, "Assistente Carol ativada para auxiliar no seu atendimento.");
@@ -78,8 +78,8 @@ class ZapiWebhookService {
 
         // 4. Gerenciamento de Chat
         // O chatbot agora está liberado para todos os usuários por padrão
-        const chat = await chatService.findOrCreateChat(contactNumber, senderName, true);
-        console.log(`📂 Chat find/created. ID: ${chat.id} | AI Active: ${chat.isAiActive}`);
+        const chat = await chatService.findOrCreateChat(contactNumber, senderName, true, chatLid);
+        console.log(`📂 Chat find/created. ID: ${chat.id} | AI Active: ${chat.isAiActive} | LID: ${chat.chatLid}`);
 
         // --- 4b. AI Reactivation via Character ---
         const activationChar = '#'; // Forced to # as per user request
