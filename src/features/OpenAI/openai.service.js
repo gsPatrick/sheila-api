@@ -79,7 +79,7 @@ Você é Carol, a assistente virtual da Advocacia Andrade Nascimento.
 
 ### 🛠️ FUNCIONALIDADES DISPONÍVEIS
 Você possui ferramentas integradas para:
-- **Consultar andamentos processuais**: Utilize \`get_process_status\` para repassar atualizações automáticas ao cliente.
+- **Consultar andamentos processuais**: Utilize \`get_process_status\` para repassar atualizações automáticas ao cliente. **REGRA DE SEGURANÇA**: Sempre peça o CPF/CNPJ para consultar, mesmo que já exista um no sistema, a menos que o cliente tenha acabado de enviar na conversa.
 - **Responder dúvidas frequentes**: Esclareça dúvidas sobre o processo ou áreas de atuação.
 - **Análise de documentos**: Leia e resuma documentos para facilitar a compreensão (Lembre-se do aviso sobre análise técnica da Dra. Sheila).
 
@@ -238,13 +238,13 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
                     type: "function",
                     function: {
                         name: "get_process_status",
-                        description: "Fetches the current status and latest updates of the customer's legal processes from Tramitação Inteligente. Use this only when the customer asks about their process or case progress. If you don't have the customer's CPF in the 'CONTEXTO ATUAL', you MUST ask them for it before calling this tool.",
+                        description: "Fetches current status of legal processes from Tramitação Inteligente. SECURITY RULES: 1. ALWAYS ask the customer for their CPF/CNPJ BEFORE calling this tool. 2. IGNORE the CPF in 'CONTEXTO ATUAL' as it may be auto-generated/fictional. 3. Only skip asking if the customer already sent the CPF spontaneously in the LATEST messages of the current conversation.",
                         parameters: {
                             type: "object",
                             properties: {
-                                cpf: { type: "string", description: "The customer's CPF (numbers only). Providing this ensures a successful lookup even if the chat is not fully synced." }
+                                cpf: { type: "string", description: "The customer's CPF (numbers only). This MUST be provided by the user in this interaction." }
                             },
-                            required: []
+                            required: ["cpf"]
                         }
                     }
                 }
@@ -313,6 +313,9 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
                                 triageStatus: data.triageStatus || chat.triageStatus
                             });
 
+                            // 📡 Broadcast local update immediately
+                            if (io) io.emit('chat_updated', chat.get({ plain: true }));
+
                             // 🔄 Auto-Sync to TI Portal
                             if (isSyncable && !chat.tramitacaoCustomerId) {
                                 console.log(`🚀 Lead data captured. Using CPF ${finalCpf}. Triggering auto-sync...`);
@@ -325,6 +328,10 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
                                         cpf_cnpj: finalCpf,
                                         email: data.email || chat.email
                                     });
+
+                                    // 📡 Broadcast sync status immediately
+                                    await chat.reload();
+                                    if (io) io.emit('chat_updated', chat.get({ plain: true }));
 
                                     if (finalNotes) {
                                         await tramitacaoService.upsertNote(chat.id, finalNotes).catch(e =>

@@ -77,12 +77,9 @@ class ZapiWebhookService {
         }
 
         // 4. Gerenciamento de Chat
-        const allowedSuffixes = ['7183141335', '71983141335', '11968070834', '968070834'];
-        const isWhitelisted = allowedSuffixes.some(suffix => contactNumber.endsWith(suffix));
-
-        // Se não for White-list, cria com IA desativada para não confundir no painel
-        const chat = await chatService.findOrCreateChat(contactNumber, senderName, isWhitelisted);
-        console.log(`📂 Chat found/created. ID: ${chat.id} | AI Active: ${chat.isAiActive}`);
+        // O chatbot agora está liberado para todos os usuários por padrão
+        const chat = await chatService.findOrCreateChat(contactNumber, senderName, true);
+        console.log(`📂 Chat find/created. ID: ${chat.id} | AI Active: ${chat.isAiActive}`);
 
         // --- 4b. AI Reactivation via Character ---
 
