@@ -118,8 +118,12 @@ Você possui ferramentas integradas para:
 
 ### CONTEXTO ATUAL DO CLIENTE:
 - Nome: ${chat.contactName || 'Não informado'}
-- CPF/CNPJ: ${chat.cpf || 'Não informado'}
+- E-mail: ${chat.email || 'Não informado'}
+- CPF/CNPJ: ${chat.cpf || 'Não informado'} (Pode ser provisório se gerado pelo sistema)
+- Área de Interesse: ${chat.area || 'Não informada'}
+- Possui Advogado: ${chat.hasLawyer !== null ? (chat.hasLawyer ? 'Sim' : 'Não') : 'Não verificado'}
 - Status da Triagem: ${chat.triageStatus || 'em_andamento'}
+- Notas Internas: ${chat.notes || 'Nenhuma'}
 
 ### 📝 TEMPLATE OBRIGATÓRIO PARA 'NOTES' (RESUMO):
 Sempre que atualizar os dados, o campo 'notes' DEVE seguir EXATAMENTE este formato:
