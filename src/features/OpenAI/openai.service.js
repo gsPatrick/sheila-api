@@ -404,7 +404,7 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
                                     content: `TOOL RESULT: No processes found.
                                     CRITICAL INSTRUCTION: You MUST reply with EXACTLY this message (do not change a word):
                                     
-                                    "Não estamos conseguindo acessar ao sistema neste momento ou não há processos associados ao CPF/CNPF informado
+                                    "Não estamos conseguindo acessar ao sistema neste momento ou não há processos associados ao CPF/CNPJ informado
                                     
                                     Logo a Dra Sheila Araújo irá te atualizar quanto à questão
                                     
@@ -425,7 +425,7 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
                                 content: `TOOL ERROR: ${e.message}
                                 CRITICAL INSTRUCTION: You MUST reply with EXACTLY this message (do not change a word):
                                 
-                                "Não estamos conseguindo acessar ao sistema neste momento ou não há processos associados ao CPF/CNPF informado
+                                "Não estamos conseguindo acessar ao sistema neste momento ou não há processos associados ao CPF/CNPJ informado
                                 
                                 Logo a Dra Sheila Araújo irá te atualizar quanto à questão
                                 
