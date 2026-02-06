@@ -181,9 +181,9 @@ class ZapiWebhookService {
                 }
             });
 
-            // NEW: Trigger Hardcoded Phase 0 if it's a truly new chat OR if the chat has no name and is in 'em_andamento' (likely reset)
-            if (botMsgCount === 0 || (!chat.contactName && chat.triageStatus === 'em_andamento')) {
-                console.log(`🆕 Triage Triggered for Chat ${chat.id}. (BotMsgs: ${botMsgCount}, Name: ${chat.contactName})`);
+            // Trigger Hardcoded Phase 0 ONLY if it's a truly new chat (no bot messages sent yet)
+            if (botMsgCount === 0) {
+                console.log(`🆕 Triage Triggered for NEW Chat ${chat.id}.`);
 
                 const welcomeScript = `Olá! Você entrou em contato com o escritório da Dra Sheila Araújo.
 
