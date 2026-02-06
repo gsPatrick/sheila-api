@@ -63,6 +63,11 @@ class ZapiWebhookService {
                 const chat = await chatService.findOrCreateChat(contactNumber, senderName, false, chatLid);
                 await chatService.updateAiStatus(chat.id, true);
                 if (io) io.emit('chat_updated', { ...chat.get(), isAiActive: true });
+
+                // Trigger AI to analyze and resume proactively
+                console.log(`🚀 Proactive Resumption: Triggering AI for Chat ${chat.id}`);
+                openaiService.generateResponse(chat.id, io).catch(err => console.error('❌ Proactive GPT error:', err));
+
                 return; // Stop processing
             }
         }
@@ -92,6 +97,11 @@ class ZapiWebhookService {
             if (io) {
                 io.emit('chat_updated', chat.get({ plain: true }));
             }
+
+            // Trigger AI to analyze and resume proactively
+            console.log(`🚀 Proactive Resumption (Customer): Triggering AI for Chat ${chat.id}`);
+            openaiService.generateResponse(chat.id, io).catch(err => console.error('❌ Proactive GPT error:', err));
+
             return;
         }
 
