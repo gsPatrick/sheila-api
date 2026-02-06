@@ -365,17 +365,23 @@ class TramitacaoInteligenteService {
             try {
                 const searchResult = await this.searchCustomers(cpf);
                 const customers = searchResult.customers || (Array.isArray(searchResult) ? searchResult : []);
-                if (customers && customers.length > 0) {
-                    customerId = customers[0].id;
-                    console.log(`✅ Found customer in TI: ${customerId}. Linking now.`);
+
+                // STRICT FILTERING: Only accept if CPF matches exactly
+                const match = customers.find(c => c.cpf_cnpj && c.cpf_cnpj.replace(/\D/g, '') === cpf.replace(/\D/g, ''));
+
+                if (match) {
+                    customerId = match.id;
+                    console.log(`✅ Found customer in TI: ${customerId} (Match: ${match.name}). Linking now.`);
                     if (chat) {
                         await chat.update({
                             tramitacaoCustomerId: customerId,
-                            tramitacaoCustomerUuid: customers[0].uuid,
+                            tramitacaoCustomerUuid: match.uuid,
                             syncStatus: 'Sincronizado',
                             lastSyncAt: new Date()
                         });
                     }
+                } else {
+                    console.log(`⚠️ Search returned ${customers.length} results, but NONE matched CPF ${cpf}.`);
                 }
             } catch (e) {
                 console.error('Error searching customer during dossier fetch:', e.message);
