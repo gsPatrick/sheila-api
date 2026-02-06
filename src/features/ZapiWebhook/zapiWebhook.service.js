@@ -40,8 +40,7 @@ class ZapiWebhookService {
         }
 
         // 2b. Check if this is a Bot message (just sent by us)
-        const isBot = zapiService.checkAndClearBotMessage(msgId, body);
-        const reactivationChar = (await settingsService.getByKey('aiReactivationChar')) || '.';
+        const isBot = zapiService.checkAndClearBotMessage(msgId);
 
         if (isMsgFromMe && isBot) {
             console.log(`🤖 Bot message echo detected (ID: ${msgId}). Skipping deactivation.`);
@@ -51,14 +50,14 @@ class ZapiWebhookService {
         // --- MANUEL AI TOGGLE COMMANDS ---
         if (isMsgFromMe) {
             const cleanBody = body.trim();
-            if (cleanBody === '#') {
+            if (cleanBody === '.') {
                 console.log(`🔴 Manual Command: Deactivating AI for ${contactNumber}`);
                 const chat = await chatService.findOrCreateChat(contactNumber, senderName, false);
                 await chatService.updateAiStatus(chat.id, false);
                 if (io) io.emit('chat_updated', { ...chat.get(), isAiActive: false });
-                await zapiService.sendMessage(contactNumber, "Sua mensagem foi encaminhada diretamente à Dra. Sheila Araújo. Aguarde, em breve ela entrará em contato por aqui.");
+                await zapiService.sendMessage(contactNumber, "Carol desativada. Caso queira reativá-la, envie #");
                 return; // Stop processing
-            } if (cleanBody === reactivationChar) {
+            } if (cleanBody === '#') {
                 console.log(`🟢 Manual Command: Activating AI for ${contactNumber}`);
                 const chat = await chatService.findOrCreateChat(contactNumber, senderName, false);
                 await chatService.updateAiStatus(chat.id, true);
@@ -83,9 +82,10 @@ class ZapiWebhookService {
         console.log(`📂 Chat find/created. ID: ${chat.id} | AI Active: ${chat.isAiActive}`);
 
         // --- 4b. AI Reactivation via Character ---
+        const activationChar = '#'; // Forced to # as per user request
 
-        if (!isMsgFromMe && body.trim() === reactivationChar && reactivationChar) {
-            console.log(`🟢 Reactivating AI for Chat ${chat.id} via character: ${reactivationChar}`);
+        if (!isMsgFromMe && body.trim() === activationChar) {
+            console.log(`🟢 Reactivating AI for Chat ${chat.id} via character: ${activationChar}`);
             chat.isAiActive = true;
             await chat.save();
 

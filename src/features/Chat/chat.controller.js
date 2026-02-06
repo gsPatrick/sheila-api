@@ -107,6 +107,15 @@ class ChatController {
                 return res.status(404).json({ error: 'Chat não encontrado' });
             }
 
+            // Proactively turn OFF AI on manual interaction from dashboard
+            if (targetChat.isAiActive) {
+                console.log(`🔴 Dashboard Intervention: Deactivating AI for Chat ${targetChat.id}`);
+                await chatService.updateAiStatus(targetChat.id, false);
+                if (req.app.get('io')) {
+                    req.app.get('io').emit('chat_updated', { ...targetChat.get({ plain: true }), isAiActive: false });
+                }
+            }
+
             await zapiService.sendMessage(targetChat.contactNumber, finalBody);
             return res.json({ success: true });
         } catch (error) {
