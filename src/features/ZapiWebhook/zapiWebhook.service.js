@@ -8,6 +8,8 @@ const fs = require('fs');
 const path = require('path');
 const settingsService = require('../Settings/settings.service');
 
+const pendingResponders = new Map();
+
 class ZapiWebhookService {
     async process(payload, io) {
         const { phone, fromMe, text, audio, type, senderName, instanceId, messageId, isGroup, participant, ids, chatLid } = payload;
@@ -55,14 +57,12 @@ class ZapiWebhookService {
                 const chat = await chatService.findOrCreateChat(contactNumber, senderName, false, chatLid);
                 await chatService.updateAiStatus(chat.id, false);
                 if (io) io.emit('chat_updated', { ...chat.get(), isAiActive: false });
-                await zapiService.sendMessage(contactNumber, "Carol desativada. Caso queira reativá-la, envie #");
                 return; // Stop processing
             } if (cleanBody === '#') {
                 console.log(`🟢 Manual Command: Activating AI for ${contactNumber} (LID: ${chatLid})`);
                 const chat = await chatService.findOrCreateChat(contactNumber, senderName, false, chatLid);
                 await chatService.updateAiStatus(chat.id, true);
                 if (io) io.emit('chat_updated', { ...chat.get(), isAiActive: true });
-                await zapiService.sendMessage(contactNumber, "Assistente Carol ativada para auxiliar no seu atendimento.");
                 return; // Stop processing
             }
         }
@@ -92,9 +92,6 @@ class ZapiWebhookService {
             if (io) {
                 io.emit('chat_updated', chat.get({ plain: true }));
             }
-
-            // Send a professional confirmation
-            await zapiService.sendMessage(contactNumber, "Assistente Carol ativada para auxiliar no seu atendimento.");
             return;
         }
 
@@ -185,7 +182,7 @@ class ZapiWebhookService {
             if (botMsgCount === 0) {
                 console.log(`🆕 Triage Triggered for NEW Chat ${chat.id}.`);
 
-                const welcomeScript = `Olá! Você entrou em contato com o escritório da Dra Sheila Araújo.
+                const welcomeScript = `Olá! Você entrou em contato com o escritório da Advocacia Andrade Nascimento.
 
 Somos especialistas em Direito Previdenciário e Trabalhista e  acidente de trabalho.
 
@@ -223,9 +220,26 @@ Antes de começarmos, qual é o seu nome completo?`;
                 return; // STOP here. Don't call OpenAI.
             }
 
-            console.log('🤖 AI Active. Generating Response for ongoing conversation...');
-            // Generate AI response
-            openaiService.generateResponse(chat.id, io).catch(err => console.error('❌ GPT error:', err));
+            console.log(`🤖 AI Active for Chat ${chat.id}. Queueing response (debounce)...`);
+
+            // Clear existing timeout if any
+            if (pendingResponders.has(chat.id)) {
+                console.log(`⏱️ Extending wait for Chat ${chat.id}...`);
+                clearTimeout(pendingResponders.get(chat.id));
+            }
+
+            // Set new timeout (12 seconds of silence)
+            const timeoutId = setTimeout(async () => {
+                try {
+                    console.log(`🚀 Debounce finished. Triggering AI for Chat ${chat.id}`);
+                    pendingResponders.delete(chat.id);
+                    await openaiService.generateResponse(chat.id, io);
+                } catch (err) {
+                    console.error('❌ Debounce GPT error:', err);
+                }
+            }, 12000);
+
+            pendingResponders.set(chat.id, timeoutId);
         } else {
             console.log(`⏭️ Skipping AI. Active: ${chat.isAiActive}, FromMe: ${isMsgFromMe}`);
         }
