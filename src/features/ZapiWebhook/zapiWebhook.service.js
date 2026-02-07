@@ -87,10 +87,8 @@ class ZapiWebhookService {
         console.log(`📂 Chat find/created. ID: ${chat.id} | AI Active: ${chat.isAiActive} | LID: ${chat.chatLid}`);
 
         // --- 4b. AI Reactivation via Character ---
-        const activationChar = '#'; // Forced to # as per user request
-
-        if (!isMsgFromMe && body.trim() === activationChar) {
-            console.log(`🟢 Reactivating AI for Chat ${chat.id} via character: ${activationChar}`);
+        if (body.trim() === '.') {
+            console.log(`🟢 Reactivating AI for Chat ${chat.id} via character: .`);
             chat.isAiActive = true;
             await chat.save();
 
@@ -102,6 +100,25 @@ class ZapiWebhookService {
             console.log(`🚀 Proactive Resumption (Customer): Triggering AI for Chat ${chat.id}`);
             openaiService.generateResponse(chat.id, io).catch(err => console.error('❌ Proactive GPT error:', err));
 
+            return;
+        }
+
+        if (body.trim() === '#') {
+            console.log(`🔴 Deactivating AI for Chat ${chat.id} via character: #`);
+
+            // CLEAR PENDING AI DEBOUNCE
+            if (pendingResponders.has(chat.id)) {
+                console.log(`⏱️ Clearing pending AI response for Chat ${chat.id} due to #`);
+                clearTimeout(pendingResponders.get(chat.id));
+                pendingResponders.delete(chat.id);
+            }
+
+            chat.isAiActive = false;
+            await chat.save();
+
+            if (io) {
+                io.emit('chat_updated', { ...chat.get(), isAiActive: false });
+            }
             return;
         }
 
@@ -167,9 +184,18 @@ class ZapiWebhookService {
             }).catch(e => console.error('❌ Trello comment match error:', e.message));
         }
 
-        // 7. Desativação Automática da IA
-        if (isMsgFromMe) {
+        // 7. Desativação Automática da IA (Manual intervention from admin)
+        // Exclude control characters . and # from auto-deactivation
+        if (isMsgFromMe && body.trim() !== '.' && body.trim() !== '#') {
             console.log(`🔴 Turning OFF AI for Chat ${chat.id} due to manual message.`);
+
+            // CLEAR PENDING AI DEBOUNCE
+            if (pendingResponders.has(chat.id)) {
+                console.log(`⏱️ Clearing pending AI response for Chat ${chat.id} due to manual override`);
+                clearTimeout(pendingResponders.get(chat.id));
+                pendingResponders.delete(chat.id);
+            }
+
             await chatService.updateAiStatus(chat.id, false);
             if (io) {
                 io.emit('chat_updated', { ...chat.get(), isAiActive: false });
@@ -192,7 +218,7 @@ class ZapiWebhookService {
             if (botMsgCount === 0) {
                 console.log(`🆕 Triage Triggered for NEW Chat ${chat.id}.`);
 
-                const welcomeScript = `Olá! Você entrou em contato com o escritório da Advocacia Andrade Nascimento.
+                const welcomeScript = `Olá! Você entrou em contato com o escritório da Dra. Sheila Araújo.
 
 Somos especialistas em Direito Previdenciário e Trabalhista e  acidente de trabalho.
 

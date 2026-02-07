@@ -50,6 +50,12 @@ class OpenaiService {
         const chat = await Chat.findByPk(chatId);
         if (!chat) throw new Error('Chat not found');
 
+        // 🛡️ Safety Check: If AI was deactivated while in queue, abort.
+        if (!chat.isAiActive) {
+            console.log(`🛑 AI deactivation detected for Chat ${chatId}. Aborting response generation.`);
+            return;
+        }
+
         const messages = await Message.findAll({
             where: { ChatId: chatId },
             limit: 15,
@@ -67,7 +73,7 @@ class OpenaiService {
             role: 'system',
             content: `
 ## IDENTIDADE E PRINCÍPIOS FUNDAMENTAIS
-Você é o assistente virtual da Advocacia Andrade Nascimento.
+Você é o assistente virtual da Dra. Sheila Araújo.
 
 ### 🚨 REGRAS DE OURO (NEGATIVE CONSTRAINTS) 🚨
 1. **NUNCA** use o nome "Carol" ou qualquer outro nome próprio para se identificar. Você é o assistente virtual do escritório.
@@ -140,7 +146,7 @@ Resumo do Caso: [Descrição detalhada do problema, histórico e dúvidas do cli
 ### FASE 0: MENSAGEM DE BOAS-VINDAS E COLETA INICIAL
 **Mensagem Inicial**:
 (Só envie se o cliente ainda não tiver se identificado/dito nada. Se ele já falou, responda o cumprimento e entre na Pergunta 1 ou 2 conforme contexto).
-"Olá! Você entrou em contato com o escritório da Dra Sheila Araújo.
+"Olá! Você entrou em contato com o escritório da Dra. Sheila Araújo.
 Somos especialistas em Direito Previdenciário e Trabalhista - especialista em acidente de trabalho.
 Antes de começarmos, qual é o seu nome completo?" (Se já souber o nome, pule).
 
