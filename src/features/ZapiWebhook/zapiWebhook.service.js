@@ -21,9 +21,10 @@ class ZapiWebhookService {
             return;
         }
 
-        // 1b. Ignore GROUPS and Broadcast lists
-        if (isGroup === true || (phone && (phone.endsWith('@g.us') || phone.includes('-'))) || participant) {
-            console.log(`👥 Group/Broadcast message ignored from ${phone}`);
+        // 1b. Ignore GROUPS, Broadcast lists and NEWSLETTERS
+        const isNewsletter = phone && phone.endsWith('@newsletter');
+        if (isGroup === true || (phone && (phone.endsWith('@g.us') || phone.includes('-'))) || participant || isNewsletter) {
+            console.log(`👥 Group/Broadcast/Newsletter message ignored from ${phone}`);
             return;
         }
 
@@ -54,13 +55,14 @@ class ZapiWebhookService {
             const cleanBody = body.trim();
             if (cleanBody === '.') {
                 console.log(`🔴 Manual Command: Deactivating AI for ${contactNumber} (LID: ${chatLid})`);
-                const chat = await chatService.findOrCreateChat(contactNumber, senderName, false, chatLid);
+                // Use null for name to respect user rule: "name always asked, never from Z-API"
+                const chat = await chatService.findOrCreateChat(contactNumber, null, false, chatLid);
                 await chatService.updateAiStatus(chat.id, false);
                 if (io) io.emit('chat_updated', { ...chat.get(), isAiActive: false });
                 return; // Stop processing
             } if (cleanBody === '#') {
                 console.log(`🟢 Manual Command: Activating AI for ${contactNumber} (LID: ${chatLid})`);
-                const chat = await chatService.findOrCreateChat(contactNumber, senderName, false, chatLid);
+                const chat = await chatService.findOrCreateChat(contactNumber, null, false, chatLid);
                 await chatService.updateAiStatus(chat.id, true);
                 if (io) io.emit('chat_updated', { ...chat.get(), isAiActive: true });
 
@@ -83,7 +85,9 @@ class ZapiWebhookService {
 
         // 4. Gerenciamento de Chat
         // O chatbot agora está liberado para todos os usuários por padrão
-        const chat = await chatService.findOrCreateChat(contactNumber, senderName, true, chatLid);
+        // REGRA : contactName = null. NUNCA salvar o nome vindo do Z-API. 
+        // A Carol DEVE perguntar o nome em 100% dos casos para popular o BD corretamente.
+        const chat = await chatService.findOrCreateChat(contactNumber, null, true, chatLid);
         console.log(`📂 Chat find/created. ID: ${chat.id} | AI Active: ${chat.isAiActive} | LID: ${chat.chatLid}`);
 
         // --- 4b. AI Reactivation via Character ---
