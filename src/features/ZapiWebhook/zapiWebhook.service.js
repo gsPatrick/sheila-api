@@ -53,14 +53,22 @@ class ZapiWebhookService {
         // --- MANUEL AI TOGGLE COMMANDS ---
         if (isMsgFromMe) {
             const cleanBody = body.trim();
-            if (cleanBody === '.') {
+            if (cleanBody === '#') {
                 console.log(`🔴 Manual Command: Deactivating AI for ${contactNumber} (LID: ${chatLid})`);
                 // Use null for name to respect user rule: "name always asked, never from Z-API"
                 const chat = await chatService.findOrCreateChat(contactNumber, null, false, chatLid);
+
+                // CLEAR PENDING AI DEBOUNCE
+                if (pendingResponders.has(chat.id)) {
+                    console.log(`⏱️ Clearing pending AI response for Chat ${chat.id} due to #`);
+                    clearTimeout(pendingResponders.get(chat.id));
+                    pendingResponders.delete(chat.id);
+                }
+
                 await chatService.updateAiStatus(chat.id, false);
                 if (io) io.emit('chat_updated', { ...chat.get(), isAiActive: false });
                 return; // Stop processing
-            } if (cleanBody === '#') {
+            } if (cleanBody === '.') {
                 console.log(`🟢 Manual Command: Activating AI for ${contactNumber} (LID: ${chatLid})`);
                 const chat = await chatService.findOrCreateChat(contactNumber, null, false, chatLid);
                 await chatService.updateAiStatus(chat.id, true);
