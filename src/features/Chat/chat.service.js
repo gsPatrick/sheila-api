@@ -205,10 +205,22 @@ class ChatService {
         const active = await Chat.count({ where: { isAiActive: true } });
         const inactive = await Chat.count({ where: { isAiActive: false } });
 
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        const newToday = await Chat.count({
+            where: {
+                createdAt: {
+                    [Op.gte]: todayStart
+                }
+            }
+        });
+
         return {
             total,
             active,
-            inactive
+            inactive,
+            newToday
         };
     }
 }

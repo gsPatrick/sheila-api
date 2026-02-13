@@ -25,6 +25,10 @@ const Chat = sequelize.define('Chat', {
         type: DataTypes.BOOLEAN,
         defaultValue: true
     },
+    isWelcomeSent: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
     tramitacaoCustomerId: {
         type: DataTypes.INTEGER,
         allowNull: true

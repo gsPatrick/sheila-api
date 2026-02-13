@@ -9,9 +9,12 @@ const path = require('path');
 const settingsService = require('../Settings/settings.service');
 
 const pendingResponders = new Map();
+// Memory lock for welcome flow to prevent race conditions
+const processingWelcome = new Set();
 
 class ZapiWebhookService {
     async process(payload, io) {
+
         const { phone, fromMe, text, audio, type, senderName, instanceId, messageId, isGroup, participant, ids, chatLid } = payload;
         const msgId = messageId || payload.id || (ids && ids[0]); // Z-API variation
 
@@ -219,53 +222,68 @@ class ZapiWebhookService {
         if (chat.isAiActive && !isMsgFromMe) {
 
             // --- HARDCODED FIRST INTERACTION CHECK ---
-            const botMsgCount = await Message.count({
-                where: {
-                    ChatId: chat.id,
-                    isFromMe: true
-                }
-            });
+            // Fix: Check isWelcomeSent flag AND use count as backup
+            if (!chat.isWelcomeSent && !processingWelcome.has(chat.id)) {
+                processingWelcome.add(chat.id);
+                try {
+                    const botMsgCount = await Message.count({
+                        where: {
+                            ChatId: chat.id,
+                            isFromMe: true
+                        }
+                    });
 
-            // Trigger Hardcoded Phase 0 ONLY if it's a truly new chat (no bot messages sent yet)
-            if (botMsgCount === 0) {
-                console.log(`🆕 Triage Triggered for NEW Chat ${chat.id}.`);
+                    // Trigger Hardcoded Phase 0 ONLY if it's a truly new chat (no bot messages sent yet)
+                    if (botMsgCount === 0) {
+                        console.log(`🆕 Triage Triggered for NEW Chat ${chat.id}.`);
 
-                const welcomeScript = `Olá! Você entrou em contato com o escritório da Dra. Sheila Araújo.
+                        // 🛑 IMMEDIATE LOCK: Set flag to true to prevent race conditions during delay
+                        await chat.update({ isWelcomeSent: true });
+
+                        const welcomeScript = `Olá! Você entrou em contato com o escritório da Dra. Sheila Araújo.
 
 Somos especialistas em Direito Previdenciário e Trabalhista e  acidente de trabalho.
 
 Antes de começarmos, qual é o seu nome completo?`;
 
-                // DELAY ANTI-SPAM (3s - 6s)
-                const delay = Math.floor(Math.random() * 3000) + 3000;
-                console.log(`⏳ Waiting ${delay}ms before sending welcome message...`);
-                await new Promise(resolve => setTimeout(resolve, delay));
+                        // DELAY ANTI-SPAM (3s - 6s)
+                        const delay = Math.floor(Math.random() * 3000) + 3000;
+                        console.log(`⏳ Waiting ${delay}ms before sending welcome message...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
 
-                // 1. Send via Z-API
-                try {
-                    await zapiService.sendMessage(contactNumber, welcomeScript);
-                } catch (error) {
-                    console.error('❌ Failed to send initial welcome message:', error.message);
-                }    // We might want to stop here or continue. 
-                // If we can't send the message, saving it to DB implies we sent it, which might confuse the AI later.
-                // But blocking the crash is the priority.
+                        // 1. Send via Z-API
+                        try {
+                            await zapiService.sendMessage(contactNumber, welcomeScript);
+                        } catch (error) {
+                            console.error('❌ Failed to send initial welcome message:', error.message);
+                        }
 
+                        // 2. Save to DB so AI sees it later
+                        const welcomeMsg = await Message.create({
+                            ChatId: chat.id,
+                            body: welcomeScript,
+                            isFromMe: true,
+                            timestamp: new Date()
+                        });
 
-                // 2. Save to DB so AI sees it later
-                const welcomeMsg = await Message.create({
-                    ChatId: chat.id,
-                    body: welcomeScript,
-                    isFromMe: true,
-                    timestamp: new Date()
-                });
+                        // 3. Emit to Frontend
+                        if (io) {
+                            io.emit('new_message', { message: welcomeMsg, chat });
+                        }
 
-                // 3. Emit to Frontend
-                if (io) {
-                    io.emit('new_message', { message: welcomeMsg, chat });
+                        console.log(`✅ Hardcoded Welcome Message sent.`);
+                        processingWelcome.delete(chat.id);
+                        return; // STOP here. Don't call OpenAI.
+                    } else {
+                        // Heal: If botMsgCount > 0 but isWelcomeSent is false, set it to true to avoid future checks
+                        console.log(`🔧 Healing Chat ${chat.id}: Found messages but flag was false. Setting isWelcomeSent=true.`);
+                        await chat.update({ isWelcomeSent: true });
+                        processingWelcome.delete(chat.id);
+                    }
+                } catch (err) {
+                    console.error('❌ Welcome flow error:', err);
+                    processingWelcome.delete(chat.id);
                 }
-
-                console.log(`✅ Hardcoded Welcome Message sent.`);
-                return; // STOP here. Don't call OpenAI.
             }
 
             console.log(`🤖 AI Active for Chat ${chat.id}. Queueing response (debounce)...`);

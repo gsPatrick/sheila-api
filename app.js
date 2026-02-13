@@ -70,6 +70,10 @@ sequelize.sync({ alter: true }).then(() => {
     console.log('Database connected and synced');
     server.listen(PORT, () => {
         console.log(`Server running on port ${PORT}`);
+
+        // Start Cron Jobs
+        const cronService = require('./src/features/Cron/cron.service');
+        cronService.init();
     });
 }).catch(err => {
     console.error('Unable to connect to the database:', err);

@@ -98,6 +98,30 @@ class TramitacaoInteligenteService {
 
             return chat;
         } catch (error) {
+            // Handle "Customer already exists" (usually 422 or 409 depending on API)
+            // If CPF already in use, we should find and link it!
+            const errorMsg = error.response?.data?.errors?.join(', ') || error.message;
+            if (error.response?.status === 422 || errorMsg.includes('CPF') || errorMsg.includes('já cadastrado')) {
+                console.log(`⚠️ Customer creation failed (CPF exists?). Attempting to find and link...`);
+                try {
+                    const searchResult = await this.searchCustomers(cleanCpf);
+                    const existing = searchResult.customers?.find(c => c.cpf_cnpj?.replace(/\D/g, '') === cleanCpf);
+
+                    if (existing) {
+                        console.log(`✅ Found existing customer in TI (ID: ${existing.id}). Linking local chat.`);
+                        await chat.update({
+                            tramitacaoCustomerId: existing.id,
+                            tramitacaoCustomerUuid: existing.uuid,
+                            syncStatus: 'Sincronizado',
+                            lastSyncAt: new Date()
+                        });
+                        return chat;
+                    }
+                } catch (linkError) {
+                    console.error('❌ Failed to recover/link existing customer:', linkError.message);
+                }
+            }
+
             console.error('❌ Error creating customer in TI:', {
                 url: `${baseUrl}/clientes`,
                 status: error.response?.status,
