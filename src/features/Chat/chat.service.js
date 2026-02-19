@@ -111,7 +111,7 @@ class ChatService {
         });
     }
 
-    async findOrCreateChat(contactNumber, contactName = null, defaultAiStatus = true, chatLid = null) {
+    async findOrCreateChat(contactNumber, contactName = null, defaultAiStatus = true, chatLid = null, source = 'Orgânico') {
         let chat;
 
         // Try searching by LID first (most reliable for Z-API split identities)
@@ -134,12 +134,13 @@ class ChatService {
         }
 
         // Create new chat
-        console.log(`🆕 Creating new chat for ${contactNumber || chatLid}`);
+        console.log(`🆕 Creating new chat for ${contactNumber || chatLid} | Source: ${source}`);
         chat = await Chat.create({
             contactNumber: contactNumber || chatLid, // Fallback if no phone
             chatLid,
             contactName,
-            isAiActive: defaultAiStatus
+            isAiActive: defaultAiStatus,
+            source
         });
 
         return chat;

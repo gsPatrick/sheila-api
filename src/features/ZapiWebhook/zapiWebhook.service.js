@@ -95,10 +95,17 @@ class ZapiWebhookService {
         }
 
         // 4. Gerenciamento de Chat
+        // Detect message source (basic UTM imitation)
+        let source = 'Orgânico';
+        const lowerBody = body.toLowerCase();
+        if (lowerBody.includes('vi no facebook') || lowerBody.includes('vindo do facebook')) source = 'Facebook';
+        else if (lowerBody.includes('instagram')) source = 'Instagram';
+        else if (lowerBody.includes('google')) source = 'Google';
+
         // O chatbot agora está liberado para todos os usuários por padrão
         // REGRA : contactName = null. NUNCA salvar o nome vindo do Z-API. 
         // A Carol DEVE perguntar o nome em 100% dos casos para popular o BD corretamente.
-        const chat = await chatService.findOrCreateChat(contactNumber, null, true, chatLid);
+        const chat = await chatService.findOrCreateChat(contactNumber, null, true, chatLid, source);
         console.log(`📂 Chat find/created. ID: ${chat.id} | AI Active: ${chat.isAiActive} | LID: ${chat.chatLid}`);
 
         // --- 4b. AI Reactivation via Character ---

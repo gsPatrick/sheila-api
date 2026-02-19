@@ -73,6 +73,11 @@ const Chat = sequelize.define('Chat', {
         type: DataTypes.STRING, // 'em_andamento', 'finalizada', 'encerrada_etica'
         defaultValue: 'em_andamento'
     },
+    source: {
+        type: DataTypes.STRING, // organic, facebook, instagram, google, etc.
+        allowNull: true,
+        defaultValue: 'Orgânico'
+    },
     // Dados Expandidos do Portal TI
     phone_1: { type: DataTypes.STRING, allowNull: true },
     phone_2: { type: DataTypes.STRING, allowNull: true },

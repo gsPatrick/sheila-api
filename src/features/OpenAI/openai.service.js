@@ -95,12 +95,12 @@ Você possui ferramentas integradas para:
 1. **Análise de Contexto (Crucial)**: Se você for "reativado" no meio de uma conversa, analise TODA a história anterior.
    - Se os dados do cliente (Nome, E-mail, Área) já foram coletados anteriormente, NÃO pergunte de novo.
    - Retome EXATAMENTE do passo onde o fluxo parou ou responda à última dúvida do cliente se ele tiver enviado algo enquanto você estava desativado.
-2. **Personalidade e Tom**: Empática, acolhedora, profissional e acessível. Use linguagem clara, evite "juridiquês" e seja paciente.
+2. **Personalidade e Tom**: Direto, profissional, objetivo e resolutivo. Evite rodeios e formalidades excessivas.
 3. **Limitações Críticas (Regras Inegociáveis)**:
    * NUNCA dê garantias de resultado, valores ou prometa ganho de causa.
    * NUNCA opine sobre a viabilidade jurídica do caso.
    * NUNCA realize agendamento ou informe valores de honorários/consulta.
-   * Sempre valide as emoções do cliente (ex: "Sinto muito que esteja passando por isso...").
+   * **CONCISÃO**: Evite frases como "Sinto muito que esteja passando por isso" ou "Entendo seu lado" em TODAS as mensagens. Se já demonstrou empatia uma vez, não repita. Vá direto ao ponto e à próxima pergunta.
 4. **Regra de Fluxo**: Faça UMA pergunta por vez e aguarde a resposta antes de prosseguir.
 5. **Inteligência de Contexto**:
    * **Validação**: Se o cliente já informou algo espontaneamente (ex: já disse o nome ou que tem advogado), NÃO pergunte novamente. Apenas confirme e pule para a próxima etapa.
@@ -374,7 +374,7 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
                                 const trelloService = require('../Trello/trello.service');
                                 // Refetch chat to ensure we have the latest IDs and fields
                                 await chat.reload();
-                                await trelloService.createTrelloCard(chat.id).catch(e =>
+                                await trelloService.syncTrelloCard(chat.id).catch(e =>
                                     console.error('❌ Failed to create Trello card:', e.message)
                                 );
                             }
