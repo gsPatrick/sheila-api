@@ -301,6 +301,8 @@ class TramitacaoInteligenteService {
         let page = 1;
         let totalPages = 1;
 
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
         try {
             do {
                 console.log(`📡 Fetching TI customers page ${page}...`);
@@ -313,6 +315,7 @@ class TramitacaoInteligenteService {
                 allCustomers = allCustomers.concat(customers);
                 totalPages = pagination.pages;
                 page++;
+                if (page <= totalPages) await sleep(1000); // 1s delay between pages
             } while (page <= totalPages);
 
             console.log(`✅ Fetched ${allCustomers.length} customers from TI. Syncing to local DB...`);
@@ -325,18 +328,32 @@ class TramitacaoInteligenteService {
                     where: {
                         [Op.or]: [
                             { tramitacaoCustomerId: customer.id },
-                            { cpf: cleanCpf }
-                        ]
+                            { cpf: { [Op.ne]: null, [Op.eq]: cleanCpf } }
+                        ].filter(cond => {
+                            if (cond.cpf && !cleanCpf) return false;
+                            return true;
+                        })
                     }
                 });
+
+                // Fetch Dossier/Processes for this customer to feed the AI
+                let processesData = [];
+                try {
+                    console.log(`📡 Fetching processes for TI ID ${customer.id}...`);
+                    const dossier = await this.getDossierById(customer.id);
+                    processesData = dossier.processes || [];
+                    await sleep(500); // 500ms delay between customers
+                } catch (dossierErr) {
+                    console.error(`⚠️ Could not fetch processes for customer ${customer.id}:`, dossierErr.message);
+                }
 
                 const updatePayload = {
                     tramitacaoCustomerId: customer.id,
                     tramitacaoCustomerUuid: customer.uuid,
-                    contactName: customer.name || chat.contactName,
-                    cpf: cleanCpf || chat.cpf,
-                    email: customer.email || chat.email,
-                    phone_1: customer.phone_1,
+                    contactName: customer.name || (chat ? chat.contactName : ''),
+                    cpf: cleanCpf || (chat ? chat.cpf : ''),
+                    email: customer.email || (chat ? chat.email : ''),
+                    phone_1: customer.phone_mobile || customer.phone_1,
                     phone_2: customer.phone_2,
                     country: customer.country,
                     state: customer.state,
@@ -354,20 +371,18 @@ class TramitacaoInteligenteService {
                     rg_numero: customer.rg_numero,
                     rg_data_emissao: customer.rg_data_emissao,
                     father_name: customer.father_name,
-                    father_name: customer.father_name,
                     mother_name: customer.mother_name,
                     syncStatus: 'Sincronizado',
-                    lastSyncAt: new Date()
+                    lastSyncAt: new Date(),
+                    processesJson: processesData.length > 0 ? JSON.stringify(processesData) : null
                 };
 
                 if (chat) {
-                    // Update existing
                     await chat.update(updatePayload);
                 } else {
-                    // Create new local entry if it doesn't exist
                     await Chat.create({
                         ...updatePayload,
-                        contactNumber: `TI_${customer.id}` // Placeholder identifier
+                        contactNumber: `TI_${customer.id}` // Placeholder if no number found
                     });
                 }
             }
@@ -377,6 +392,13 @@ class TramitacaoInteligenteService {
             console.error('❌ Error syncing TI customers:', error.message);
             throw new Error('Failed to sync customers from Tramitacao Inteligente');
         }
+    }
+
+    async getDossierById(customerId) {
+        const headers = await this.getHeaders();
+        const baseUrl = await this.getBaseUrl();
+        const response = await axios.get(`${baseUrl}/clientes/${customerId}`, { headers });
+        return response.data.customer || response.data;
     }
 
     async getDossier(chatId, providedCpf = null) {

@@ -245,7 +245,7 @@ class ZapiWebhookService {
                         console.log(`🆕 Triage Triggered for NEW Chat ${chat.id}.`);
 
                         // 🛑 IMMEDIATE LOCK: Set flag to true to prevent race conditions during delay
-                        await chat.update({ isWelcomeSent: true });
+                        await chat.update({ isWelcomeSent: true, triageStatus: 'em_andamento' });
 
                         const welcomeScript = `Olá! Você entrou em contato com o escritório da Dra. Sheila Araújo.
 

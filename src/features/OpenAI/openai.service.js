@@ -130,6 +130,7 @@ Você possui ferramentas integradas para:
 - Possui Advogado: ${chat.hasLawyer !== null ? (chat.hasLawyer ? 'Sim' : 'Não') : 'Não verificado'}
 - Status da Triagem: ${chat.triageStatus || 'em_andamento'}
 - Notas Internas: ${chat.notes || 'Nenhuma'}
+- Processos Judiciais (TI): ${chat.processesJson || 'Nenhum processo vinculado ou encontrado.'}
 
 ### 📝 TEMPLATE OBRIGATÓRIO PARA 'NOTES' (RESUMO):
 Sempre que atualizar os dados, o campo 'notes' DEVE seguir EXATAMENTE este formato:
@@ -338,16 +339,20 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
 
                             // 🔄 Auto-Sync to TI Portal
                             if (isSyncable && !chat.tramitacaoCustomerId) {
-                                console.log(`🚀 Lead data captured. Using CPF ${finalCpf}. Triggering auto-sync...`);
+                                console.log(`🚀 Lead data captured for Chat ${chat.id}. Syncable: ${isSyncable}. Finishing: ${isFinishing}. Triggering auto-sync...`);
                                 try {
-                                    // Try to create directly (since random CPF likely doesn't exist)
-                                    // Or search first if we want to be safe, but simplified flow:
-                                    console.log(`✨ Creating in TI with Provisonal CPF...`);
-                                    await tramitacaoService.createCustomer(chat.id, {
-                                        name: data.name || chat.contactName,
+                                    console.log(`✨ Attempting to create/link in TI...`);
+                                    const syncResult = await tramitacaoService.createCustomer(chat.id, {
+                                        name: extractedName,
                                         cpf_cnpj: finalCpf,
                                         email: data.email || chat.email
                                     });
+
+                                    if (syncResult && syncResult.tramitacaoCustomerId) {
+                                        console.log(`✅ Auto-sync SUCCESS for Chat ${chat.id}. TI ID: ${syncResult.tramitacaoCustomerId}`);
+                                    } else {
+                                        console.warn(`⚠️ Auto-sync returned no ID for Chat ${chat.id}.`);
+                                    }
 
                                     // 📡 Broadcast sync status immediately
                                     await chat.reload();
@@ -359,13 +364,15 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
                                         );
                                     }
                                 } catch (e) {
-                                    console.error('❌ TI Auto-sync error:', e.message);
+                                    console.error(`❌ TI Auto-sync error for Chat ${chat.id}:`, e.message);
                                 }
                             } else if (finalNotes && chat.tramitacaoCustomerId) {
-                                // Regular note update
+                                console.log(`📝 Syncing note update for Chat ${chat.id}...`);
                                 await tramitacaoService.upsertNote(chat.id, finalNotes).catch(e =>
                                     console.error('❌ Failed to auto-sync note to TI:', e.message)
                                 );
+                            } else {
+                                console.log(`ℹ️ Auto-sync skipped for Chat ${chat.id}. Syncable: ${isSyncable}, Has ID: ${!!chat.tramitacaoCustomerId}`);
                             }
 
                             // 📋 Trello Integration: Create card on finalization
