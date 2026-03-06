@@ -5,6 +5,8 @@ const Chat = require('./Chat');
 const Message = require('./Message');
 const AlertLog = require('./AlertLog');
 
+const Publication = require('./Publication');
+
 // Associations
 Message.belongsTo(Chat, { foreignKey: 'ChatId' });
 Chat.hasMany(Message, { foreignKey: 'ChatId' });
@@ -18,5 +20,6 @@ module.exports = {
     Blacklist,
     Chat,
     Message,
-    AlertLog
+    AlertLog,
+    Publication
 };

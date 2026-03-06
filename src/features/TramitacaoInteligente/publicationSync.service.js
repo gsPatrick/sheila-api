@@ -20,8 +20,8 @@ class PublicationSyncService {
         });
 
         // Rate limiting settings
-        this.delayBetweenPages = 1000; // 1 second between page requests
-        this.delayBetweenPublications = 500; // 0.5 second between publication requests
+        this.delayBetweenPages = 5000; // 5 seconds between page requests
+        this.delayBetweenPublications = 3000; // 3 seconds between publication requests
         this.delayOnRateLimit = 30000; // 30 seconds on rate limit
         this.maxRetries = 3;
     }
@@ -32,7 +32,7 @@ class PublicationSyncService {
         // Get login page for CSRF token
         const initialPage = await this.client.get('/usuarios/login');
         const $ = cheerio.load(initialPage.data);
-        const authenticityToken = $('input[name="authenticity_token"]').val();
+        const authenticityToken = $('meta[name="csrf-token"]').attr('content') || $('input[name="authenticity_token"]').val();
         this.updateCookies(initialPage.headers['set-cookie']);
 
         if (!authenticityToken) {
@@ -130,6 +130,9 @@ class PublicationSyncService {
      */
     async fetchAllPublications() {
         console.log('\n📋 Fetching all publications...');
+        
+        // Let's import the Publication model here or at the top
+        const Publication = require('../../models/Publication');
 
         const allPublications = [];
         let page = 1;
@@ -161,14 +164,38 @@ class PublicationSyncService {
                 continue;
             }
 
-            console.log(`    Found ${pubIds.size} publications`);
+            console.log(`    Found ${pubIds.size} publications on page`);
 
             // Fetch each publication's details
             for (const pubId of pubIds) {
-                const pub = await this.fetchPublicationDetails(pubId);
-                if (pub) {
-                    allPublications.push(pub);
+                // 1. Check if already exists in our DB
+                const existingPub = await Publication.findByPk(pubId);
+                if (existingPub) {
+                    console.log(`    ⏩ Skipping pub ${pubId} (Already in Database)`);
+                    allPublications.push(existingPub.toJSON());
+                    continue; // Skip the scraping
                 }
+
+                // 2. Doesn't exist, we must scrape it
+                const pubDetails = await this.fetchPublicationDetails(pubId);
+                if (pubDetails) {
+                    // 3. Save to Database
+                    const newPub = await Publication.create({
+                        id: pubDetails.id,
+                        processo: pubDetails.processo,
+                        cpfs: pubDetails.cpfs,
+                        customerNames: [], // No longer resolving names from Chat
+                        summary: pubDetails.summary,
+                        prazo: pubDetails.prazo,
+                        acaoNecessaria: pubDetails.acaoNecessaria,
+                        dataPublicacao: pubDetails.dataPublicacao,
+                        isRead: pubDetails.isRead
+                    });
+
+                    console.log(`    📥 Saved new pub ${pubId} to Database`);
+                    allPublications.push(newPub.toJSON());
+                }
+                
                 await this.sleep(this.delayBetweenPublications);
             }
 
@@ -176,7 +203,7 @@ class PublicationSyncService {
             await this.sleep(this.delayBetweenPages);
         }
 
-        console.log(`\n✅ Total publications fetched: ${allPublications.length}`);
+        console.log(`\n✅ Total publications processed: ${allPublications.length}`);
         return allPublications;
     }
 
@@ -259,70 +286,21 @@ class PublicationSyncService {
     }
 
     /**
-     * Sync publications to database and match with existing chats
+     * Sync publications to database
      * @returns {Object} Sync results
      */
     async syncToDatabase() {
-        console.log('\n🔄 Starting full publication sync...');
+        console.log('\n🔄 Starting full publication sync (to Database)...');
 
         await this.login();
         const publications = await this.fetchAllPublications();
 
-        // Group publications by CPF
-        const pubsByCpf = {};
-        for (const pub of publications) {
-            for (const cpf of pub.cpfs) {
-                if (!pubsByCpf[cpf]) {
-                    pubsByCpf[cpf] = [];
-                }
-                pubsByCpf[cpf].push(pub);
-            }
-        }
-
-        console.log(`\n📊 Found publications for ${Object.keys(pubsByCpf).length} unique CPFs`);
-
-        // Match with existing chats
         const results = {
-            totalPublications: publications.length,
-            uniqueCpfs: Object.keys(pubsByCpf).length,
-            matchedChats: 0,
-            unmatchedCpfs: []
+            totalPublicationsProcessed: publications.length,
+            syncedAt: new Date()
         };
 
-        for (const cpf of Object.keys(pubsByCpf)) {
-            // Find chat with this CPF
-            const chat = await Chat.findOne({
-                where: { cpf: cpf }
-            });
-
-            if (chat) {
-                results.matchedChats++;
-
-                // Update chat with publication data
-                const pubs = pubsByCpf[cpf];
-                const latestPub = pubs[0]; // Assuming sorted by date
-
-                await chat.update({
-                    latestPublicationId: latestPub.id,
-                    latestPublicationProcesso: latestPub.processo,
-                    latestPublicationSummary: latestPub.summary,
-                    latestPublicationPrazo: latestPub.prazo,
-                    publicationsCount: pubs.length,
-                    publicationsSyncedAt: new Date()
-                });
-
-                console.log(`  ✅ Updated chat for CPF ${cpf}: ${pubs.length} publications`);
-            } else {
-                results.unmatchedCpfs.push(cpf);
-            }
-        }
-
-        console.log(`\n✅ Sync complete!`);
-        console.log(`  Total publications: ${results.totalPublications}`);
-        console.log(`  Unique CPFs: ${results.uniqueCpfs}`);
-        console.log(`  Matched chats: ${results.matchedChats}`);
-        console.log(`  Unmatched CPFs: ${results.unmatchedCpfs.length}`);
-
+        console.log(`\n✅ Sync complete! Total processed: ${results.totalPublicationsProcessed}`);
         return results;
     }
 }

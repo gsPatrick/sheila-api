@@ -2,9 +2,10 @@ const axios = require('axios');
 const fs = require('fs');
 const FormData = require('form-data');
 const settingsService = require('../Settings/settings.service');
-const { Message, Chat } = require('../../models');
+const { Message, Chat, Publication } = require('../../models');
 const zapiService = require('../ZapiWebhook/zapi.service');
 const tramitacaoService = require('../TramitacaoInteligente/tramitacaoInteligente.service');
+const { Op } = require('sequelize');
 
 class OpenaiService {
     async transcribeAudio(messageId, audioPath) {
@@ -86,7 +87,7 @@ Você é o assistente virtual da Dra. Sheila Araújo.
 
 ### 🛠️ FUNCIONALIDADES DISPONÍVEIS
 Você possui ferramentas integradas para:
-- **Consultar andamentos processuais**: Utilize \`get_process_status\` para repassar atualizações automáticas ao cliente. **REGRA DE SEGURANÇA**: Sempre peça o CPF/CNPJ para consultar, mesmo que já exista um no sistema, a menos que o cliente tenha acabado de enviar na conversa.
+- **Consultar andamentos processuais**: Utilize \`get_process_status\` para repassar atualizações automáticas ao cliente. **REGRA DE SEGURANÇA**: Sempre peça o CPF/CNPJ para consultar, mesmo que já exista um no sistema, a menos que o cliente tenha acabado de enviar na conversa. A busca de processos é SEMPRE feita no CPF informado pelo cliente na hora, NUNCA no CPF cadastrado no contexto.
 - **Responder dúvidas frequentes**: Esclareça dúvidas sobre o processo ou áreas de atuação.
 - **Análise de documentos**: Leia e resuma documentos para facilitar a compreensão (Lembre-se do aviso sobre análise técnica da Dra. Sheila).
 
@@ -105,6 +106,7 @@ Você possui ferramentas integradas para:
 5. **Inteligência de Contexto**:
    * **Validação**: Se o cliente já informou algo espontaneamente (ex: já disse o nome ou que tem advogado), NÃO pergunte novamente. Apenas confirme e pule para a próxima etapa.
    * **Foco**: Se o cliente fugir do assunto, responda brevemente e traga ele de volta para o ponto onde parou no roteiro.
+   * **CLIENTE RECORRENTE (REGRA DE RENOVAÇÃO)**: Se no bloco de CONTEXTO abaixo o "Nome" já estiver preenchido com o nome da pessoa, isso significa que os dados de contato já foram coletados no passado e o chat foi reiniciado hoje. Neste caso, siga EXATAMENTE O MESMO FLUXO de triagem (faça as mesmas perguntas do roteiro), porém **CANCELE a pergunta do NOME e a pergunta do E-MAIL**. Inicie o atendimento com a Mensagem de Boas-Vindas padrão e já pule para a Verificação Ética ou Identificação da Demanda. NÃO invente saudações novas.
 
 ### 🛡️ PROTOCOLOS ESPECIAS (SITUAÇÕES ESPECÍFICAS)
 1. **OFERTA DE SERVIÇOS OU VENDAS**:
@@ -125,7 +127,7 @@ Você possui ferramentas integradas para:
 ### CONTEXTO ATUAL DO CLIENTE:
 - Nome: ${chat.contactName || 'Não informado'}
 - E-mail: ${chat.email || 'Não informado'}
-- CPF/CNPJ: ${chat.cpf || 'Não informado'} (Pode ser provisório se gerado pelo sistema)
+- CPF/CNPJ: ${chat.cpf || 'Não informado'}
 - Área de Interesse: ${chat.area || 'Não informada'}
 - Possui Advogado: ${chat.hasLawyer !== null ? (chat.hasLawyer ? 'Sim' : 'Não') : 'Não verificado'}
 - Status da Triagem: ${chat.triageStatus || 'em_andamento'}
@@ -145,16 +147,17 @@ Resumo do Caso: [Descrição detalhada do problema, histórico e dúvidas do cli
 ## FLUXO DE TRIAGEM (PASSO A PASSO)
 
 ### FASE 0: MENSAGEM DE BOAS-VINDAS E COLETA INICIAL
-**Mensagem Inicial**:
-(Só envie se o cliente ainda não tiver se identificado/dito nada. Se ele já falou, responda o cumprimento e entre na Pergunta 1 ou 2 conforme contexto).
+**Mensagem Inicial OBRIGATÓRIA**:
+(Envie sempre no início do atendimento, adaptando apenas o final dependendo se já sabe o nome ou não).
 "Olá! Você entrou em contato com o escritório da Dra. Sheila Araújo.
 Somos especialistas em Direito Previdenciário e Trabalhista - especialista em acidente de trabalho.
-Antes de começarmos, qual é o seu nome completo?" (Se já souber o nome, pule).
+Antes de começarmos, qual é o seu nome completo?" (Se já constar o nome do cliente no CONTEXTO, **omita** a pergunta do nome e prossiga para a próxima etapa apropriada do roteiro).
 
-**1. Coleta de Dados Cadastrais Essenciais**:
-- **Pergunta 1 (OBRIGATÓRIA)**: Agradeça pelo nome e peça o e-mail: "Obrigado, [Nome]! Para facilitar o contato posterior da equipe jurídica, você poderia me informar seu melhor e-mail?"
-  * NOTA: Se o cliente disser que "não tem", "não usa" ou "não quer informar", ACEITE e deixe vazio. Diga "Sem problemas!" e prossiga.
-  * NOTA: NÃO PEÇA O CPF. O sistema gera o cadastro internamente. NÃO MENCIONE ISSO AO CLIENTE. Apenas siga para a verificação ética.
+**1. Coleta de Dados Cadastrais Essenciais (Pule se o E-mail já constar no contexto)**:
+- **Pergunta 1 (OBRIGATÓRIA PARA NOVOS)**: Agradeça pelo nome e peça o e-mail: "Obrigado, [Nome]! Para facilitar o contato posterior da equipe jurídica, você poderia me informar seu melhor e-mail?"
+  * NOTA: Se o cliente disser que "não tem", "não usa" ou se o e-mail já constar no contexto, ACEITE e pule esta pergunta.
+  * NOTA DA TRIAGEM: NÃO PEÇA O CPF NA TRIAGEM. O sistema gera o cadastro internamente.
+  * NOTA DE CONSULTA DE PROCESSO: Apenas peça o CPF **se e somente se** o cliente perguntar ativamente sobre andamento de processos (ex: "Como está meu processo?") para que você possa usar a ferramenta \`get_process_status\`. Sempre pergunte o CPF para a consulta processual.
 **2. Verificação Ética**:
 - **Pergunta 3 (Obrigatória)**: Antes de continuarmos, preciso fazer uma pergunta importante: Você já possui algum advogado cuidando deste caso atualmente?
   - Se SIM: Encerre educadamente (status: encerrada_etica). Reforce a ética profissional e diga que não podemos intervir em causas com patrono constituído.
@@ -252,7 +255,7 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
                     type: "function",
                     function: {
                         name: "get_process_status",
-                        description: "Fetches current status of legal processes from Tramitação Inteligente. SECURITY RULES: 1. ALWAYS ask the customer for their CPF/CNPJ BEFORE calling this tool. 2. IGNORE the CPF in 'CONTEXTO ATUAL' as it may be auto-generated/fictional. 3. Only skip asking if the customer already sent the CPF spontaneously in the LATEST messages of the current conversation.",
+                        description: "Fetches current status of legal processes from Tramitação Inteligente and Local Database. SECURITY RULES: 1. ALWAYS ask the customer for their CPF/CNPJ BEFORE calling this tool. 2. IGNORE the CPF in 'CONTEXTO ATUAL' because process search is NEVER done with the registered CPF, but always with the CPF the user informs right now. 3. Only skip asking if the customer already sent the CPF spontaneously in the LATEST messages of the current conversation.",
                         parameters: {
                             type: "object",
                             properties: {
@@ -413,20 +416,46 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
                     } else if (toolCall.function.name === 'get_process_status') {
                         try {
                             const args = JSON.parse(toolCall.function.arguments || '{}');
+                            const cleanCpf = (args.cpf || '').replace(/\D/g, '');
                             console.log(`🔍 AI requested process status for Chat ${chatId}. Args:`, args);
-                            const dossier = await tramitacaoService.getDossier(chatId, args.cpf);
+                            
+                            // 1. Fetch live dossier logic (might fail if API down)
+                            const dossier = await tramitacaoService.getDossier(chatId, cleanCpf).catch(e => {
+                                console.warn('Warning: Failed to fetch live dossier from TI API, proceeding to DB Publications.', e.message);
+                                return { processes: [] };
+                            });
+
+                            // 2. Fetch local Publications for this CPF
+                            const localPubs = await Publication.findAll({
+                                where: {
+                                    cpfs: { [Op.like]: `%${cleanCpf}%` }
+                                },
+                                order: [['createdAt', 'DESC']],
+                                limit: 10
+                            });
+
+                            const mergedResult = {
+                                dossierProcessosEncontrados: dossier.processes || [],
+                                publicacoesRecentesNoDiarioOficial: localPubs.map(p => ({
+                                    processo: p.processo,
+                                    resumo: p.summary,
+                                    prazo: p.prazo,
+                                    acaoNecessaria: p.acaoNecessaria,
+                                    dataPublicacao: p.dataPublicacao
+                                }))
+                            };
 
                             // Check if processes exist
-                            if (!dossier.processes || dossier.processes.length === 0) {
-                                console.log('⚠️ No processes found in dossier.');
+                            if (mergedResult.dossierProcessosEncontrados.length === 0 && mergedResult.publicacoesRecentesNoDiarioOficial.length === 0) {
+                                console.log('⚠️ No processes or publications found.');
                                 currentMessages.push({
                                     role: 'system',
                                     content: `TOOL RESULT: No processes found.
                                     CRITICAL INSTRUCTION: You MUST reply with EXACTLY this message (do not change a word):
                                     
-                                    "Não estamos conseguindo acessar ao sistema neste momento ou não há processos associados ao CPF/CNPJ informado
+                                    "Não estamos conseguindo acessar ao sistema neste momento ou não há processos/publicações associados ao CPF/CNPJ informado.
                                     
-                                    Logo a Dra Sheila Araújo irá te atualizar quanto à questão
+                                    Logo a Dra Sheila Araújo irá te atualizar quanto à questão.
                                     
                                     Enquanto isso, posso lhe auxiliar em algo mais?"`
                                 });
@@ -435,7 +464,7 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
                                     role: 'tool',
                                     tool_call_id: toolCall.id,
                                     name: 'get_process_status',
-                                    content: JSON.stringify(dossier)
+                                    content: JSON.stringify(mergedResult)
                                 });
                             }
                         } catch (e) {

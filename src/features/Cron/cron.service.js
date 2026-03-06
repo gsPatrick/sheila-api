@@ -11,6 +11,10 @@ class CronService {
         cron.schedule('0 0 * * *', async () => {
             console.log('🕛 Running Daily Reset Job (Midnight)...');
             await this.resetDailyChats();
+            
+            console.log('📰 Starting Daily Publication Sync...');
+            const publicationSyncService = require('../TramitacaoInteligente/publicationSync.service');
+            await publicationSyncService.syncToDatabase();
         }, {
             scheduled: true,
             timezone: "America/Sao_Paulo"

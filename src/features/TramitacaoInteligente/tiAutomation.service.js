@@ -27,7 +27,7 @@ class TIAutomationService {
             // 1. Get initial login page to grab CSRF token
             const initialPage = await this.client.get('/usuarios/login');
             const $ = cheerio.load(initialPage.data);
-            const authenticityToken = $('input[name="authenticity_token"]').val();
+            const authenticityToken = $('meta[name="csrf-token"]').attr('content') || $('input[name="authenticity_token"]').val();
 
             this.updateCookies(initialPage.headers['set-cookie']);
 

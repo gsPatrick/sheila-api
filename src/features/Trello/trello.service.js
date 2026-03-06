@@ -75,6 +75,37 @@ class TrelloService {
         // Find existing card first
         let card = await this.findTrelloCard(chat.contactNumber);
 
+        // EXTRAÇÃO E PRESERVAÇÃO DO HISTÓRICO
+        let historicoAnterior = '';
+        if (card && card.desc) {
+            const oldDesc = card.desc;
+            
+            let oldNotes = '';
+            // Captura o resumo antigo
+            const resumoMatch = oldDesc.match(/### RESUMO DO CASO\n([\s\S]*?)(?=\n###|\n---)/);
+            if (resumoMatch && resumoMatch[1]) {
+                oldNotes = resumoMatch[1].trim();
+            }
+
+            let pastHistory = '';
+            // Captura o histórico já acumulado
+            const historyMatch = oldDesc.match(/### HISTÓRICO DE ATENDIMENTOS\n([\s\S]*?)(?=\n---)/);
+            if (historyMatch && historyMatch[1]) {
+                pastHistory = historyMatch[1].trim();
+            }
+
+            // Se existe uma nota antiga diferente da atual, empilha no histórico
+            const currentNotes = chat.notes ? chat.notes.trim() : '';
+            if (oldNotes && oldNotes !== 'Nenhuma nota disponível.' && oldNotes !== currentNotes) {
+                const dataHoje = new Date().toLocaleDateString('pt-BR');
+                pastHistory = `✅ **[Atendimento antigo arquivado em ${dataHoje}]**\n${oldNotes}\n\n` + pastHistory;
+            }
+
+            if (pastHistory) {
+                historicoAnterior = `\n### HISTÓRICO DE ATENDIMENTOS\n${pastHistory}`;
+            }
+        }
+
         const title = `${chat.contactName?.toUpperCase() || 'CLIENTE NOVO'} - ${chat.contactNumber}`;
 
         // Helper to slugify name for the URL
@@ -115,7 +146,7 @@ class TrelloService {
 
 ### RESUMO DO CASO
 ${chat.notes || 'Nenhuma nota disponível.'}
-
+${historicoAnterior}
 ---
 *Gerado automaticamente pelo Sistema Carol IA*
         `;
