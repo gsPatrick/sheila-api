@@ -346,42 +346,12 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
                             // 📡 Broadcast local update immediately
                             if (io) io.emit('chat_updated', chat.get({ plain: true }));
 
-                            // 🔄 Auto-Sync to TI Portal
-                            if (isSyncable && !chat.tramitacaoCustomerId) {
-                                console.log(`🚀 Lead data captured for Chat ${chat.id}. Syncable: ${isSyncable}. Finishing: ${isFinishing}. Triggering auto-sync...`);
-                                try {
-                                    console.log(`✨ Attempting to create/link in TI...`);
-                                    const syncResult = await tramitacaoService.createCustomer(chat.id, {
-                                        name: extractedName,
-                                        cpf_cnpj: finalCpf,
-                                        email: data.email || chat.email
-                                    });
-
-                                    if (syncResult && syncResult.tramitacaoCustomerId) {
-                                        console.log(`✅ Auto-sync SUCCESS for Chat ${chat.id}. TI ID: ${syncResult.tramitacaoCustomerId}`);
-                                    } else {
-                                        console.warn(`⚠️ Auto-sync returned no ID for Chat ${chat.id}.`);
-                                    }
-
-                                    // 📡 Broadcast sync status immediately
-                                    await chat.reload();
-                                    if (io) io.emit('chat_updated', chat.get({ plain: true }));
-
-                                    if (finalNotes) {
-                                        await tramitacaoService.upsertNote(chat.id, finalNotes).catch(e =>
-                                            console.error('❌ Failed to push initial note:', e.message)
-                                        );
-                                    }
-                                } catch (e) {
-                                    console.error(`❌ TI Auto-sync error for Chat ${chat.id}:`, e.message);
-                                }
-                            } else if (finalNotes && chat.tramitacaoCustomerId) {
-                                console.log(`📝 Syncing note update for Chat ${chat.id}...`);
-                                await tramitacaoService.upsertNote(chat.id, finalNotes).catch(e =>
+                            // 🔄 Syncing note to TI if already linked (for updates)
+                            if (finalNotes && chat.tramitacaoCustomerId) {
+                                console.log(`📝 Syncing note update for Chat ${chat.id} to TI...`);
+                                tramitacaoService.upsertNote(chat.id, finalNotes).catch(e =>
                                     console.error('❌ Failed to auto-sync note to TI:', e.message)
                                 );
-                            } else {
-                                console.log(`ℹ️ Auto-sync skipped for Chat ${chat.id}. Syncable: ${isSyncable}, Has ID: ${!!chat.tramitacaoCustomerId}`);
                             }
 
                             // 📋 Trello Integration: Create card on finalization

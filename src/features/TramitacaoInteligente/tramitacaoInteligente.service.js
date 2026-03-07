@@ -1,4 +1,4 @@
-const { Chat } = require('../../models');
+const { Chat, SyncedCustomer } = require('../../models');
 const { Op } = require('sequelize');
 const axios = require('axios').default || require('axios');
 console.log('AXIOS LOADED in TramitacaoService:', typeof axios);
@@ -66,12 +66,12 @@ class TramitacaoInteligenteService {
             const createdCustomer = response.data.customer || response.data;
             const { id, uuid } = createdCustomer;
 
-            await chat.update({
+            // Updated fields payload
+            const updatePayload = {
                 tramitacaoCustomerId: id,
                 tramitacaoCustomerUuid: uuid,
                 cpf: cleanCpf,
                 contactName: manualData.name || chat.contactName,
-                // Full fields sync
                 email: manualData.email || chat.email,
                 phone_1: manualData.phone_1 || '',
                 phone_2: manualData.phone_2 || '',
@@ -94,31 +94,59 @@ class TramitacaoInteligenteService {
                 mother_name: manualData.mother_name || '',
                 syncStatus: 'Sincronizado',
                 lastSyncAt: new Date()
-            });
+            };
+
+            await chat.update(updatePayload);
+
+            // 📝 LOG IN SyncedCustomer TABLE
+            await SyncedCustomer.upsert({
+                contactNumber: chat.contactNumber,
+                cpf: cleanCpf,
+                name: updatePayload.contactName,
+                email: updatePayload.email,
+                tramitacaoCustomerId: id,
+                syncedAt: new Date()
+            }, { where: { contactNumber: chat.contactNumber } });
+
+            console.log(`✅ Customer ${id} synced and logged in SyncedCustomer table.`);
 
             return chat;
         } catch (error) {
-            // Handle "Customer already exists" (usually 422 or 409 depending on API)
-            // If CPF already in use, we should find and link it!
             const errorMsg = error.response?.data?.errors?.join(', ') || error.message;
             if (error.response?.status === 422 || errorMsg.includes('CPF') || errorMsg.includes('já cadastrado')) {
-                console.log(`⚠️ Customer creation failed (CPF exists?). Attempting to find and link...`);
+                console.log(`⚠️ Customer creation failed (CPF exists?). Attempting to find and update phone...`);
                 try {
                     const searchResult = await this.searchCustomers(cleanCpf);
                     const existing = searchResult.customers?.find(c => c.cpf_cnpj?.replace(/\D/g, '') === cleanCpf);
 
                     if (existing) {
-                        console.log(`✅ Found existing customer in TI (ID: ${existing.id}). Linking local chat.`);
+                        console.log(`✅ Found existing customer in TI (ID: ${existing.id}). Updating phone and linking.`);
+                        
+                        // Update phone in TI for the existing account
+                        await this.updateCustomerDirect(existing.id, { phone_mobile: cleanPhone });
+
                         await chat.update({
                             tramitacaoCustomerId: existing.id,
                             tramitacaoCustomerUuid: existing.uuid,
                             syncStatus: 'Sincronizado',
-                            lastSyncAt: new Date()
+                            lastSyncAt: new Date(),
+                            cpf: cleanCpf
                         });
+
+                        // 📝 LOG IN SyncedCustomer TABLE
+                        await SyncedCustomer.upsert({
+                            contactNumber: chat.contactNumber,
+                            cpf: cleanCpf,
+                            name: chat.contactName,
+                            email: chat.email,
+                            tramitacaoCustomerId: existing.id,
+                            syncedAt: new Date()
+                        }, { where: { contactNumber: chat.contactNumber } });
+
                         return chat;
                     }
                 } catch (linkError) {
-                    console.error('❌ Failed to recover/link existing customer:', linkError.message);
+                    console.error('❌ Failed to recover/update existing customer:', linkError.message);
                 }
             }
 
@@ -137,16 +165,15 @@ class TramitacaoInteligenteService {
         if (!chat || !chat.tramitacaoCustomerId) {
             throw new Error('Chat not found or not linked to TI');
         }
+        return this.updateCustomerDirect(chat.tramitacaoCustomerId, updateData);
+    }
 
+    async updateCustomerDirect(tiId, updateData) {
         const headers = await this.getHeaders();
         const baseUrl = await this.getBaseUrl();
 
         try {
-            const response = await axios.patch(`${baseUrl}/clientes/${chat.tramitacaoCustomerId}`, { cliente: updateData }, { headers });
-
-            // Update local sync time
-            await chat.update({ lastSyncAt: new Date() });
-
+            const response = await axios.patch(`${baseUrl}/clientes/${tiId}`, { customer: updateData }, { headers });
             return response.data;
         } catch (error) {
             console.error('Error updating customer in TI:', error.response?.data || error.message);
@@ -469,6 +496,28 @@ class TramitacaoInteligenteService {
         } else {
             console.log(`📝 Creating new Triage Note in TI`);
             return this.createNote(chatId, content, userId);
+        }
+    }
+
+    async handleAutoSync(chatId) {
+        try {
+            const chat = await Chat.findByPk(chatId);
+            if (!chat) return;
+
+            // Automation Trigger Logic:
+            // 1. triageStatus must be 'finalizada'
+            // 2. Must have CPF (required for TI)
+            // 3. Not already synced in this context (or we can re-sync if needed, but usually once is enough)
+            
+            const isFinishing = chat.triageStatus === 'finalizada';
+            const hasCpf = !!chat.cpf;
+            
+            if (isFinishing && hasCpf && chat.syncStatus !== 'Sincronizado') {
+                console.log(`🤖 Auto-Sync Triggered for Chat ${chatId} (${chat.contactNumber})`);
+                await this.createCustomer(chatId);
+            }
+        } catch (error) {
+            console.error(`❌ Auto-Sync Error for Chat ${chatId}:`, error.message);
         }
     }
 }

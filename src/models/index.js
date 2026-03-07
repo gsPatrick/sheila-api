@@ -6,6 +6,7 @@ const Message = require('./Message');
 const AlertLog = require('./AlertLog');
 
 const Publication = require('./Publication');
+const SyncedCustomer = require('./SyncedCustomer');
 
 // Associations
 Message.belongsTo(Chat, { foreignKey: 'ChatId' });
@@ -21,5 +22,6 @@ module.exports = {
     Chat,
     Message,
     AlertLog,
-    Publication
+    Publication,
+    SyncedCustomer
 };
