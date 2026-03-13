@@ -184,11 +184,11 @@ ${historicoAnterior}
                         idLabels: matchingLabel ? matchingLabel.id : undefined
                     }
                 });
-                console.log(`✅ Trello Card created: ${response.data.shortUrl}`);
+                console.log(`✅ Trello Card created: ${response.data.shortUrl} for ${chat.contactNumber}`);
                 return response.data;
             }
         } catch (error) {
-            console.error('❌ Trello sync error:', error.response?.data || error.message);
+            console.error(`❌ Trello sync error [Chat ${chatId}]:`, error.response?.data || error.message);
             return null;
         }
     }

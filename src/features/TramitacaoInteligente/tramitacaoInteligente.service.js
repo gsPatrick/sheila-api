@@ -513,8 +513,10 @@ class TramitacaoInteligenteService {
             const hasCpf = !!chat.cpf;
             
             if (isFinishing && hasCpf && chat.syncStatus !== 'Sincronizado') {
-                console.log(`🤖 Auto-Sync Triggered for Chat ${chatId} (${chat.contactNumber})`);
+                console.log(`🤖 Auto-Sync Success for Chat ${chatId}`);
                 await this.createCustomer(chatId);
+            } else {
+                console.log(`ℹ️ Auto-Sync Skip: Finishing=${isFinishing}, HasCPF=${hasCpf}, Currently=${chat.syncStatus}`);
             }
         } catch (error) {
             console.error(`❌ Auto-Sync Error for Chat ${chatId}:`, error.message);

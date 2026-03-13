@@ -102,8 +102,9 @@ const Chat = sequelize.define('Chat', {
 
 // 🤖 AUTOMATION HOOK: Always try to sync with TI when status changes to 'finalizada'
 Chat.afterUpdate(async (chat, options) => {
-    // Avoid circular dependency by requiring service inside hook
+    // Avoid circular dependency by requiring services inside hook
     const tramitacaoService = require('../features/TramitacaoInteligente/tramitacaoInteligente.service');
+    const trelloService = require('../features/Trello/trello.service');
     
     // Check if status changed to finalizada or if CPF was just added to a finalizada chat
     const changedToFinalized = chat.changed('triageStatus') && chat.triageStatus === 'finalizada';
@@ -111,9 +112,15 @@ Chat.afterUpdate(async (chat, options) => {
 
     if (changedToFinalized || cpfAddedToFinalized) {
         console.log(`⚡ Chat Hook: Triggering auto-sync for Chat ${chat.id}...`);
-        // We run this async without blocking the main update response
+        
+        // 1. Sync to TI
         tramitacaoService.handleAutoSync(chat.id).catch(err => 
             console.error('❌ Hook TI Auto-Sync failed:', err.message)
+        );
+
+        // 2. Sync to Trello
+        trelloService.syncTrelloCard(chat.id).catch(err =>
+            console.error('❌ Hook Trello Sync failed:', err.message)
         );
     }
 });

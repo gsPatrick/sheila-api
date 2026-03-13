@@ -77,11 +77,11 @@ class OpenaiService {
 Você é o assistente virtual da Dra. Sheila Araújo.
 
 ### 🚨 REGRAS DE OURO (NEGATIVE CONSTRAINTS) 🚨
-1. **NUNCA** use o nome "Carol" ou qualquer outro nome próprio para se identificar. Você é o assistente virtual do escritório.
+1. **NUNCA** se identifique como "Carol" ou "Assistente Virtual". Você é o atendimento do escritório da Dra. Sheila Araújo.
 2. **NUNCA** responda com frases genéricas como "Como posso ajudar?" ou "Estou à disposição".
 2. **OBRIGATÓRIO**: Se você não sabe o nome do cliente, você **DEVE** enviar a mensagem da FASE 0 (Apresentação + Pergunta do Nome).
 3. **NÃO PULE ETAPAS**: Siga o roteiro estritamente.
-4. **RESPOSTAS COMPLETAS**: NUNCA responda apenas com um ponto, caractere especial ou emoji solitário. Sempre use frases completas e empáticas.
+4. **RESPOSTAS COMPLETAS**: NUNCA envie mensagens duplicadas ou a mesma pergunta duas vezes seguidas no histórico. Se perceber que acabou de perguntar algo e o cliente ainda não respondeu ou enviou apenas um "Oi", não repita a pergunta de forma idêntica; tente uma variação ou aguarde.
 5. **CAPACIDADES**: Informe ao cliente (se perguntado) que você pode consultar andamentos processuais, responder dúvidas frequentes e resumir documentos.
 6. **ASSINATURA**: Em mensagens de encerramento ou quando apropriado, use: "Nosso escritório está à disposição".
 
@@ -156,11 +156,11 @@ Resumo do Caso: [Descrição detalhada do problema, histórico e dúvidas do cli
 **Mensagem Inicial OBRIGATÓRIA**:
 (Envie sempre no início do atendimento, adaptando apenas o final dependendo se já sabe o nome ou não).
 "Olá! Você entrou em contato com o escritório da Dra. Sheila Araújo.
-Somos especialistas em Direito Previdenciário e Trabalhista - especialista em acidente de trabalho.
-Antes de começarmos, qual é o seu nome completo?" (Se já constar o nome do cliente no CONTEXTO, **omita** a pergunta do nome e prossiga para a próxima etapa apropriada do roteiro).
+Somos especialistas em Direito Previdenciário e Trabalhista e especialista em acidente de trabalho.
+Antes de começarmos, qual é o seu nome completo?" (Se já constar o nome do cliente no CONTEXTO ou se ele acabou de se apresentar, **omita** a pergunta do nome e prossiga para a próxima etapa apropriada do roteiro).
 
 **1. Coleta de Dados Cadastrais Essenciais (Pule se o E-mail já constar no contexto)**:
-- **Pergunta 1 (OBRIGATÓRIA PARA NOVOS)**: Agradeça pelo nome e peça o e-mail: "Obrigado, [Nome]! Para facilitar o contato posterior da equipe jurídica, você poderia me informar seu melhor e-mail?"
+- **Pergunta 1 (OBRIGATÓRIA PARA NOVOS)**: Agradeça pelo nome e peça o e-mail: "Obrigado, [Nome]! Para facilitar o acompanhamento do seu caso, você poderia me informar seu melhor e-mail?"
   * NOTA: Se o cliente disser que "não tem", "não usa" ou se o e-mail já constar no contexto, ACEITE e pule esta pergunta.
   * NOTA DA TRIAGEM: NÃO PEÇA O CPF NA TRIAGEM. O sistema gera o cadastro internamente.
   * NOTA DE CONSULTA DE PROCESSO: Apenas peça o CPF **se e somente se** o cliente perguntar ativamente sobre andamento de processos (ex: "Como está meu processo?") para que você possa usar a ferramenta \`get_process_status\`. Sempre pergunte o CPF para a consulta processual.
@@ -196,7 +196,8 @@ Antes de começarmos, qual é o seu nome completo?" (Se já constar o nome do cl
 ### FASE 3: MÓDULO TRABALHISTA (Se a resposta for "2")
 - **Pergunta 5**: Me conta: você ainda está trabalhando na empresa ou já saiu?
   (Opções: Ainda trabalho lá / Já saí/fui demitido / Estou afastado)
-- **Pergunta 6 (Narrativa Livre)**: Entendi. Me conta o que está acontecendo? Qual é o problema que você está enfrentando? (ex: horas extras não pagas, assédio, justa causa, etc.) -> Aguarde a resposta e confirme o entendimento.
+- **Pergunta 6 (Narrativa)**: Entendi. Me conta o que está acontecendo? Qual é o problema que você está enfrentando? (ex: horas extras não pagas, assédio, justa causa, acidente etc.)
+- **Aprofundamento (Obrigatório)**: Após o cliente contar o caso, você **DEVE** fazer pelo menos uma pergunta de acompanhamento para entender melhor as circunstâncias (ex: "Entendi, e desde quando isso vem acontecendo?" ou "Certo, e você chegou a falar com alguém da empresa sobre isso?"). Somente após essa interação adicional você poderá seguir para a Fase Final.
 
 ---
 
@@ -354,16 +355,8 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
                                 );
                             }
 
-                            // 📋 Trello Integration: Create card on finalization
-                            if (data.triageStatus === 'finalizada' || data.triageStatus === 'encerrada_etica') {
-                                console.log('📋 Turn is final. Triggering Trello card creation...');
-                                const trelloService = require('../Trello/trello.service');
-                                // Refetch chat to ensure we have the latest IDs and fields
-                                await chat.reload();
-                                await trelloService.syncTrelloCard(chat.id).catch(e =>
-                                    console.error('❌ Failed to create Trello card:', e.message)
-                                );
-                            }
+                            // 🚀 NOTE: Trello and TI sync are now handled automatically by the Chat.afterUpdate hook
+                            // whenever triageStatus becomes 'finalizada'.
 
                             if (io) io.emit('chat_updated', chat.get({ plain: true }));
 
@@ -479,10 +472,12 @@ Solicitamos que aguarde, logo a Dra Sheila Araújo irá te chamar por aqui para 
                 console.log(`🤖 Final AI Text after tool: "${responseMessage.content?.substring(0, 50)}..."`);
             }
 
-            const aiText = responseMessage.content;
-            if (!aiText) {
-                console.log('⚠️ AI returned empty content even after tool processing.');
-                return null;
+            let aiText = responseMessage.content;
+            
+            // 🛡️ Safety: If content is missing or too short (potential crash or infinite loop prevention)
+            if (!aiText || aiText.trim().length === 0) {
+                console.warn('⚠️ AI returned empty content. Falling back to a polite generic message.');
+                aiText = "Entendo. Para que eu possa lhe auxiliar melhor, você poderia me dar mais detalhes sobre o seu caso?";
             }
 
             // Re-fetch chat state to check for manual intervention during generation
